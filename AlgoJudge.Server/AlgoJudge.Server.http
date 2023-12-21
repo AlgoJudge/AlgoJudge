@@ -1,0 +1,6 @@
+@AlgoJudge.Server_HostAddress = http://localhost:5171
+
+GET {{AlgoJudge.Server_HostAddress}}/ping/ping
+Accept: application/json
+
+###
