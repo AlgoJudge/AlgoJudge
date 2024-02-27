@@ -9,7 +9,11 @@
     <PublishAssetsDirectory>$(MSBuildProjectDirectory)\dist</PublishAssetsDirectory>
   </PropertyGroup>
   <ItemGroup>
-    <Folder Include="public\" />
-    <Folder Include="src\assets\" />
+    <Folder Include="api\" />
+    <Folder Include="public\locales\en\" />
+    <Folder Include="src\components\logo\" />
+    <Folder Include="src\components\footer\" />
+    <Folder Include="src\pages\login\" />
+    <Folder Include="src\pages\register\" />
   </ItemGroup>
 </Project>

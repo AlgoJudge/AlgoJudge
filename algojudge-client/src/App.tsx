@@ -1,29 +1,45 @@
-import { useEffect, useState } from 'react';
 import './App.css';
+import '@mantine/core/styles.css';
+
+import { MantineProvider } from '@mantine/core';
+import { RouterProvider, createBrowserRouter } from 'react-router-dom';
+import Home from './pages/home/Home';
+import Login from './pages/login/Login';
+import Register from './pages/register/Register';
+import Manage from './pages/manage/Manage';
+import Layout from './Layout';
 
 function App() {
-    const [ping, setPing] = useState<string>();
 
-    useEffect(() => {
-        fetchPing();
-    }, []);
-
-    const contents = ping === undefined
-        ? <p>Loading...</p>
-        : <p>{ping}</p>;
+    const router = createBrowserRouter([
+        {
+            element: <Layout />,
+            children: [
+                {
+                    path: "/",
+                    element: <Home />
+                },
+                {
+                    path: "/login",
+                    element: <Login />
+                },
+                {
+                    path: "/register",
+                    element: <Register />
+                },
+                {
+                    path: "/manage",
+                    element: <Manage />
+                }
+            ]
+        }
+    ]);
 
     return (
-        <div>
-            <h1>Ping</h1>
-            {contents}
-        </div>
+        <MantineProvider>
+            <RouterProvider router={router} />
+        </MantineProvider>
     );
-
-    async function fetchPing() {
-        const response = await fetch('ping/ping');
-        const data = await response.text();
-        setPing(data);
-    }
 }
 
 export default App;

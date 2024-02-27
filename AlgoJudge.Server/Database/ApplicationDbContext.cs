@@ -5,12 +5,8 @@ using File = AlgoJudge.Server.Database.Models.File;
 
 namespace AlgoJudge.Server.Database
 {
-    public class ApplicationDbContext : IdentityDbContext<User>
+    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<User>(options)
     {
-        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
-        {
-        }
-
         public DbSet<File> Files { get; set; }
         public DbSet<Problem> Problems { get; set; }
         public DbSet<SeriesProblem> SeriesProblems { get; set; }
