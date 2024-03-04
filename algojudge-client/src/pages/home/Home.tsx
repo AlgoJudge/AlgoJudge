@@ -1,3 +1,4 @@
+import { Anchor } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -7,7 +8,7 @@ function Home() {
     return (
         <>
             <h1>{t('Home')}</h1>
-            <Link to="/manage">{t('Manage activities')}</Link>
+            <Anchor component={Link} to="/manage">{t('Manage activities')}</Anchor>
         </>
     )
 }

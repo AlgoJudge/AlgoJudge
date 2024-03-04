@@ -1,33 +1,65 @@
-import { Menu, Group, Center, Burger, Container } from '@mantine/core';
+import { Burger, Center, Container, Group, Menu, useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconChevronDown } from '@tabler/icons-react';
-import classes from './Header.module.css';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { EventType } from '../../../api/EventDispatcher';
+import { useAuth } from '../../provider/AuthProvider';
+import { useSession } from '../../provider/SessionProvider';
 import Logo from '../logo/Logo';
+import classes from './Header.module.css';
+import { notifications } from '@mantine/notifications';
+import { usePreferences } from '../../provider/PreferencesProvider';
 
 function Header() {
     const [opened, { toggle }] = useDisclosure(false);
+    const { eventDispatcher } = useSession();
 
-    const { t } = useTranslation()
+    const notify = (msg: string) => {
+        notifications.show({
+            title: 'Connection error',
+            message: 'Server response ' + msg,
+            color: "red"
+        })
+    }
 
-    const links = [
+    useEffect(() => {
+        // TODO
+        eventDispatcher.addEventListener(EventType.FORBIDDEN, () => notify('FORBIDDEN'));
+        eventDispatcher.addEventListener(EventType.UNAUTHORIZED, () => notify('UNAUTHORIZED'));
+        eventDispatcher.addEventListener(EventType.INVALID_STATUS_CODE, () => notify('INVALID_STATUS_CODE'));
+    }, []);
+
+    const { t, i18n } = useTranslation();
+    const { user, logout } = useAuth();
+
+
+
+    const { theme, lang } = usePreferences();
+    const { setColorScheme } = useMantineColorScheme();
+
+    useEffect(() => { if (theme) setColorScheme(theme) }, [theme])
+    useEffect(() => { if (lang) i18n.changeLanguage(lang) }, [lang])
+
+    const links = user === undefined ? [] : user ?[
         { link: '/', label: t('Home') },
-        { link: '/login', label: t('Login') },
-        { link: '/register', label: t('Register') },
         {
             link: '#1',
-            label: 'Lang',
+            label: user.email,
             links: [
-                { link: '#1-en', label: 'English' },
-                { link: '#1-pl', label: 'Polski' },
+                { link: '#logout', label: 'Logout', func: () => logout() },
             ],
         }
+    ] : [
+        { link: '/', label: t('Home') },
+        { link: '/login', label: t('Login') },
+        { link: '/register', label: t('Register') }
     ];
 
     const items = links.map((link) => {
         const menuItems = link.links?.map((item) => (
-            <Menu.Item key={item.link}>{item.label}</Menu.Item>
+            <Menu.Item key={item.link} onClick={(event) => { event.preventDefault(); if (item.func) item.func(); }}>{item.label}</Menu.Item>
         ));
 
         if (menuItems) {

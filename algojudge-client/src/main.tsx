@@ -4,9 +4,12 @@ import App from './App.tsx'
 import './index.css'
 
 import './i18n';
+import { PreferencesProvider } from './provider/PreferencesProvider.tsx';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+    <React.StrictMode>
+        <PreferencesProvider>
+            <App />
+        </PreferencesProvider>
+    </React.StrictMode>,
 )

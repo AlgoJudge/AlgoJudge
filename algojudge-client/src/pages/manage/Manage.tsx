@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
-import { activityApi } from '../../../api/Api'
 import { Table } from '@mantine/core';
 import { ActivityInfo } from '../../../api/ActivityApi';
+import { useSession } from "../../provider/SessionProvider";
 
 function Manage() {
 
     const [activities, setActivities] = useState<ActivityInfo[]>([]);
+    const { activityApi } = useSession();
 
     useEffect(() => {
-        activityApi.List().then((res) => setActivities(res));
-    }, [])
+        activityApi.getList().then((res) => setActivities(res));
+    }, [activityApi])
 
     return (
         <>

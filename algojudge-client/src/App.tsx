@@ -1,13 +1,16 @@
-import './App.css';
 import '@mantine/core/styles.css';
+import '@mantine/notifications/styles.css';
+import './App.css';
 
 import { MantineProvider } from '@mantine/core';
+import { Notifications } from '@mantine/notifications';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
+import Layout from './Layout';
 import Home from './pages/home/Home';
 import Login from './pages/login/Login';
-import Register from './pages/register/Register';
 import Manage from './pages/manage/Manage';
-import Layout from './Layout';
+import Register from './pages/register/Register';
+import Authentication from './routers/Authentication';
 
 function App() {
 
@@ -29,16 +32,17 @@ function App() {
                 },
                 {
                     path: "/manage",
-                    element: <Manage />
+                    element: <Authentication><Manage /></Authentication>
                 }
             ]
         }
-    ]);
+    ], { basename: import.meta.env.BASE_URL });
 
     return (
-        <MantineProvider>
-            <RouterProvider router={router} />
-        </MantineProvider>
+            <MantineProvider>
+                <Notifications />
+                <RouterProvider router={router} />
+            </MantineProvider>
     );
 }
 

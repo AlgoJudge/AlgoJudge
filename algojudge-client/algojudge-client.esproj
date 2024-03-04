@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/0.5.128-alpha">
+﻿<Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/0.5.128-alpha">
   <PropertyGroup>
     <StartupCommand>npm run dev</StartupCommand>
     <JavaScriptTestRoot>src\</JavaScriptTestRoot>
@@ -13,7 +13,7 @@
     <Folder Include="public\locales\en\" />
     <Folder Include="src\components\logo\" />
     <Folder Include="src\components\footer\" />
+    <Folder Include="src\routers\" />
     <Folder Include="src\pages\login\" />
-    <Folder Include="src\pages\register\" />
   </ItemGroup>
 </Project>
