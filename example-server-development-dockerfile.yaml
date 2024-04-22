@@ -1,0 +1,35 @@
+name: algojudge-server
+
+services:
+
+  postgres:
+    image: postgres:latest
+    volumes:
+      - algojudge_dev_db_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=algojudge
+      - POSTGRES_USER=algojudge
+      - POSTGRES_DB=algojudge
+    ports:
+      - '127.0.0.1:5432:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U algojudge -d algojudge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  algojudge:
+    build:
+      context: .
+      dockerfile: AlgoJudge.Server/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+    - '127.0.0.1:8080:8080'
+    environment:
+    - DOTNET_ENVIRONMENT=Development
+    - DB_CONNECTION_STRING=Host=postgres;Database=algojudge;Username=algojudge;Password=algojudge
+
+volumes:
+  algojudge_dev_db_data:

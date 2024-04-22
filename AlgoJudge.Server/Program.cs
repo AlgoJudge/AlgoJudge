@@ -15,8 +15,14 @@ namespace AlgoJudge.Server
 
             // Add services to the container.
 
-            builder.Services.AddDbContext<ApplicationDbContext>(
-                options => options.UseNpgsql(builder.Configuration.GetConnectionString("ApplicationContext")));
+            {
+                String? dbConnectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
+                //Console.WriteLine($"Connection string: {connectionString}");
+                dbConnectionString ??= builder.Configuration.GetConnectionString("ApplicationContext");
+                builder.Services.AddDbContext<ApplicationDbContext>(
+                options => options.UseNpgsql(dbConnectionString));
+            }
+
             builder.Services.AddAuthorization();
             builder.Services.AddIdentityApiEndpoints<User>()
                 .AddEntityFrameworkStores<ApplicationDbContext>();
@@ -45,6 +51,11 @@ namespace AlgoJudge.Server
             });
 
             var app = builder.Build();
+
+            {
+                using var scope = app.Services.CreateScope();
+                scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.Migrate();
+            }
 
             app.MapGroup("/identity").MapIdentityApi<User>();
 
