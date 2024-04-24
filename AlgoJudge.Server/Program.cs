@@ -52,11 +52,6 @@ namespace AlgoJudge.Server
 
             var app = builder.Build();
 
-            {
-                using var scope = app.Services.CreateScope();
-                scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.Migrate();
-            }
-
             app.MapGroup("/identity").MapIdentityApi<User>();
 
             // Configure the HTTP request pipeline.
@@ -64,6 +59,21 @@ namespace AlgoJudge.Server
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
+
+                using (var scope = app.Services.CreateScope())
+                {
+                    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    db.Database.Migrate();
+                }
+            }
+
+            using (var scope = app.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                if (db.Database.GetPendingMigrations().Any())
+                {
+                    throw new Exception("Database has pending migrations");
+                }
             }
 
             //app.UseCors(builder => builder.AllowAnyMethod().AllowAnyHeader().AllowAnyOrigin()); // TODO
