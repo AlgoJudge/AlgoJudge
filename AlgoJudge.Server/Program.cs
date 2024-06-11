@@ -13,10 +13,16 @@ namespace AlgoJudge.Server
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            builder.Configuration.AddEnvironmentVariables(prefix: "AJ_");
+            
             // Add services to the container.
 
-            builder.Services.AddDbContext<ApplicationDbContext>(
-                options => options.UseNpgsql(builder.Configuration.GetConnectionString("ApplicationContext")));
+            {
+                var dbConnectionString = builder.Configuration.GetConnectionString("DbConnectionString");
+                builder.Services.AddDbContext<ApplicationDbContext>(
+                options => options.UseNpgsql(dbConnectionString));
+            }
+
             builder.Services.AddAuthorization();
             builder.Services.AddIdentityApiEndpoints<User>()
                 .AddEntityFrameworkStores<ApplicationDbContext>();
@@ -53,6 +59,21 @@ namespace AlgoJudge.Server
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
+
+                using (var scope = app.Services.CreateScope())
+                {
+                    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    db.Database.Migrate();
+                }
+            }
+
+            using (var scope = app.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                if (db.Database.GetPendingMigrations().Any())
+                {
+                    throw new Exception("Database has pending migrations");
+                }
             }
 
             //app.UseCors(builder => builder.AllowAnyMethod().AllowAnyHeader().AllowAnyOrigin()); // TODO
