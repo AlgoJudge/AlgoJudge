@@ -29,7 +29,7 @@ services:
     - '127.0.0.1:8080:8080'
     environment:
     - DOTNET_ENVIRONMENT=Development
-    - DB_CONNECTION_STRING=Host=postgres;Database=algojudge;Username=algojudge;Password=algojudge
+    - AJ_ConnectionStrings__DbConnectionString=Host=postgres;Database=algojudge;Username=algojudge;Password=algojudge
 
 volumes:
   algojudge_dev_db_data:

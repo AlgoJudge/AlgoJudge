@@ -13,12 +13,12 @@ namespace AlgoJudge.Server
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            builder.Configuration.AddEnvironmentVariables(prefix: "AJ_");
+            
             // Add services to the container.
 
             {
-                String? dbConnectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
-                //Console.WriteLine($"Connection string: {connectionString}");
-                dbConnectionString ??= builder.Configuration.GetConnectionString("ApplicationContext");
+                var dbConnectionString = builder.Configuration.GetConnectionString("DbConnectionString");
                 builder.Services.AddDbContext<ApplicationDbContext>(
                 options => options.UseNpgsql(dbConnectionString));
             }
