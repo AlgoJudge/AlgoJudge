@@ -727,11 +727,11 @@ public class FederatedSignInTests(ServerFixture server)
     {
         var provider = await NewProviderAsync(
             "nested",
-            rules: [("algojudge-lecturers", "manager")],
+            rules: [("algojudge-managers", "manager")],
             claimPath: "realm_access.roles");
 
         var outcome = await SignInAsync(provider, Token("nested-0001",
-            ("realm_access", """{"roles":["algojudge-lecturers","offline_access"]}"""),
+            ("realm_access", """{"roles":["algojudge-managers","offline_access"]}"""),
             ("preferred_username", "a.nowak"),
             ("given_name", "Anna"),
             ("family_name", "Nowak"),
@@ -766,11 +766,11 @@ public class FederatedSignInTests(ServerFixture server)
     {
         var provider = await NewProviderAsync(
             "mismatched",
-            rules: [("algojudge-lecturers", "manager")],
+            rules: [("algojudge-managers", "manager")],
             claimPath: "groups");
 
         var outcome = await SignInAsync(provider, Token("mismatched-0001",
-            ("realm_access", """{"roles":["algojudge-lecturers"]}"""),
+            ("realm_access", """{"roles":["algojudge-managers"]}"""),
             ("preferred_username", "b.nowak")));
 
         Assert.False(outcome.Admitted);
