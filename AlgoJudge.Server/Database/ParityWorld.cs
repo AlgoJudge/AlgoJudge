@@ -127,13 +127,22 @@ namespace AlgoJudge.Server.Database
                  ("C", "sortowanie-topologiczne", null, 50, null),
                  ("D", "sortowanie-topologiczne", "Kolorowanie grafu", null, null)],
                 [("team7", "C", 43, "java", "completed", "Runtime error", 0, null, false),
-                 ("team7", "A", 57, "cpp", "failed", "Compilation error", null,
+                 // A compilation error is a **judged** verdict worth nothing.
+                 // The Runner scores it and reports no infrastructure failure,
+                 // so the board charges it its twenty minutes; `failed` is the
+                 // row below, where nothing came back at all.
+                 ("team7", "A", 57, "cpp", "completed", "Compilation error", 0,
                      "main.cpp:7:5: error: 'cout' was not declared in this scope", false),
                  ("team7", "C", 72, "python", "completed", "Time limit exceeded", 0, null, false),
                  ("team7", "B", 85, "cpp", "completed", "Wrong answer", 40, null, false),
                  ("team7", "A", 98, "cpp", "completed", "Accepted", 100, null, false),
                  ("team7", "B", 111, "cpp", "running", null, null, null, false),
                  ("team7", "A", 116, "cpp", "queued", null, null, null, false),
+                 // Nobody ever got a verdict for this one, and a board may say
+                 // no more about a failure of its own than that it happened:
+                 // it draws a `?` like a queued submission and costs nothing.
+                 ("team7", "D", 65, "cpp", "failed", null, null,
+                     "the Runner stopped before it reported", false),
                  ("team1", "A", 12, "cpp", "completed", "Accepted", 100, null, false),
                  ("team1", "B", 33, "cpp", "completed", "Wrong answer", 30, null, false),
                  ("team1", "B", 54, "cpp", "completed", "Accepted", 100, null, false),
