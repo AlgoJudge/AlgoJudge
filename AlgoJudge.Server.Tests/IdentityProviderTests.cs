@@ -489,6 +489,191 @@ public class IdentityProviderTests(ServerFixture server)
         Assert.Equal("provider.claimPath.invalid", await Code(refused));
     }
 
+    /// <summary>The settings body a caller written before the redirect existed sends.</summary>
+    private static object LegacySettings() => new
+    {
+        localRegistrationEnabled = false,
+        requireEmail = false,
+        requireConfirmedEmail = false,
+        showLogo = true,
+        showLocalSignIn = true,
+        accountDeletionEnabled = true,
+    };
+
+    /// <summary>The same, plus a redirect. Blank clears it.</summary>
+    private static object SettingsRedirecting(string slug) => new
+    {
+        localRegistrationEnabled = false,
+        requireEmail = false,
+        requireConfirmedEmail = false,
+        showLogo = true,
+        showLocalSignIn = true,
+        accountDeletionEnabled = true,
+        signInRedirectProvider = slug,
+    };
+
+    /// <summary>Absent is a real answer here, so this must not be a GetProperty.</summary>
+    private static string? RedirectOn(JsonElement instance) =>
+        instance.TryGetProperty("signInRedirectProvider", out var value) ? value.GetString() : null;
+
+    private static object Provider(string slug, bool enabled) => new
+    {
+        slug,
+        displayName = "University SSO",
+        issuer = "https://auth.example.invalid/application/o/algojudge",
+        clientId = "algojudge",
+        clientSecret = Secret,
+        claimPath = "groups",
+        enabled,
+        mappingRules = Array.Empty<object>(),
+    };
+
+    /// <summary>
+    /// A redirect survives a save that does not mention it.
+    ///
+    /// <para>
+    /// **This is the whole reason the field is read with `is { }` rather than the
+    /// way `Name` is read.** The settings endpoint replaces the entire object, and
+    /// three callers that predate this field omit it — including the manager
+    /// panel's own form. Under the `Name` reading, an administrator toggling
+    /// "Show the mark" would switch the sign-in path off and nothing would say so.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task A_redirect_survives_a_save_that_does_not_mention_it()
+    {
+        var admin = await Sign.InAsync(server, Seeder.DevAdminLogin, Seeder.DevAdminPassword);
+        var anonymous = server.CreateClient();
+        await Sign.Succeeded(await admin.PostAsJsonAsync(
+            "/api/v1/identity/providers", Registration("redirect-kept")));
+
+        await Sign.Succeeded(
+            await admin.PutAsJsonAsync("/api/v1/instance", SettingsRedirecting("redirect-kept")));
+        Assert.Equal("redirect-kept",
+            RedirectOn(await anonymous.GetFromJsonAsync<JsonElement>("/api/v1/instance")));
+
+        // The older body, unchanged, exactly as it is sent elsewhere in this suite.
+        await Sign.Succeeded(await admin.PutAsJsonAsync("/api/v1/instance", LegacySettings()));
+
+        Assert.Equal("redirect-kept",
+            RedirectOn(await anonymous.GetFromJsonAsync<JsonElement>("/api/v1/instance")));
+    }
+
+    /// <summary>
+    /// An empty string is how an operator turns the redirect off.
+    ///
+    /// <para>
+    /// The other half of the test above: absent has to mean *leave it alone*, so
+    /// something else has to mean *clear*, or the setting could be switched on
+    /// and never off again.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task An_empty_string_clears_the_redirect()
+    {
+        var admin = await Sign.InAsync(server, Seeder.DevAdminLogin, Seeder.DevAdminPassword);
+        var anonymous = server.CreateClient();
+        await Sign.Succeeded(await admin.PostAsJsonAsync(
+            "/api/v1/identity/providers", Registration("redirect-cleared")));
+
+        await Sign.Succeeded(
+            await admin.PutAsJsonAsync("/api/v1/instance", SettingsRedirecting("redirect-cleared")));
+        Assert.Equal("redirect-cleared",
+            RedirectOn(await anonymous.GetFromJsonAsync<JsonElement>("/api/v1/instance")));
+
+        await Sign.Succeeded(
+            await admin.PutAsJsonAsync("/api/v1/instance", SettingsRedirecting("")));
+
+        Assert.Null(RedirectOn(await anonymous.GetFromJsonAsync<JsonElement>("/api/v1/instance")));
+    }
+
+    /// <summary>
+    /// A redirect may only name a provider that would sign somebody in.
+    ///
+    /// <para>
+    /// **The disabled case is the one worth the test.** A slug that is not a slug
+    /// and a slug nobody registered are obvious; a provider that exists and is
+    /// switched off looks fine in the panel and answers 404 at the challenge, so
+    /// accepting it would put every visitor on a dead end with no way back to the
+    /// form except knowing about `?admin=true`. Nothing else in this suite would
+    /// notice the `Enabled` half of that check going missing.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task A_redirect_must_name_a_provider_that_signs_people_in()
+    {
+        var admin = await Sign.InAsync(server, Seeder.DevAdminLogin, Seeder.DevAdminPassword);
+
+        var created = await admin.PostAsJsonAsync("/api/v1/identity/providers",
+            Registration("redirect-refused"));
+        await Sign.Succeeded(created);
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString();
+
+        // Registered, and then switched off.
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            $"/api/v1/identity/providers/{id}", Provider("redirect-refused", enabled: false)));
+
+        foreach (var slug in new[] { "nobody-registered-this", "NOT A SLUG", "redirect-refused" })
+        {
+            var refused = await admin.PutAsJsonAsync(
+                "/api/v1/instance", SettingsRedirecting(slug));
+
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+            Assert.Equal("instance.signInRedirect.unknown", await Code(refused));
+        }
+    }
+
+    /// <summary>
+    /// Disabling a provider stops the redirect and does not forget it.
+    ///
+    /// <para>
+    /// **The lockout test.** The column keeps what an operator wrote and the
+    /// answer is filtered against the providers actually on offer, so switching a
+    /// provider off on a Monday morning leaves the sign-in screen drawing itself
+    /// rather than sending everybody to a 404 — and switching it back on restores
+    /// the redirect without anybody having to remember what it named.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Disabling_a_provider_takes_the_redirect_out_of_force_and_does_not_forget_it()
+    {
+        var admin = await Sign.InAsync(server, Seeder.DevAdminLogin, Seeder.DevAdminPassword);
+        var anonymous = server.CreateClient();
+
+        var created = await admin.PostAsJsonAsync("/api/v1/identity/providers",
+            Registration("redirect-forgotten"));
+        await Sign.Succeeded(created);
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString();
+
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            "/api/v1/instance", SettingsRedirecting("redirect-forgotten")));
+        Assert.Equal("redirect-forgotten",
+            RedirectOn(await anonymous.GetFromJsonAsync<JsonElement>("/api/v1/instance")));
+
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            $"/api/v1/identity/providers/{id}", Provider("redirect-forgotten", enabled: false)));
+
+        // Off the answer…
+        Assert.Null(RedirectOn(await anonymous.GetFromJsonAsync<JsonElement>("/api/v1/instance")));
+
+        // …and still in the column, which is what makes turning it back on free.
+        await using (var context = server.NewContext())
+        {
+            var stored = await context.Instance.AsNoTracking().FirstAsync();
+            Assert.Equal("redirect-forgotten", stored.SignInRedirectProvider);
+        }
+
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            $"/api/v1/identity/providers/{id}", Provider("redirect-forgotten", enabled: true)));
+
+        Assert.Equal("redirect-forgotten",
+            RedirectOn(await anonymous.GetFromJsonAsync<JsonElement>("/api/v1/instance")));
+
+        // Left as it was found, so nothing after this reads a redirect it did not set.
+        await Sign.Succeeded(
+            await admin.PutAsJsonAsync("/api/v1/instance", SettingsRedirecting("")));
+    }
+
     private static async Task<string> Read(HttpResponseMessage response) =>
         await response.Content.ReadAsStringAsync();
 

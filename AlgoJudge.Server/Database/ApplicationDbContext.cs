@@ -79,6 +79,10 @@ namespace AlgoJudge.Server.Database
                     "CK_Instance_Singleton",
                     $"\"Id\" = '{Models.Instance.SingletonId}'"));
                 e.Property(i => i.ExternalFetchHosts).HasColumnType("text[]");
+                // 32, the same ceiling `IdentityProvider.Slug` has: these hold
+                // one, and a wider column could hold something the other cannot.
+                e.Property(i => i.SignInRedirectProvider).HasMaxLength(32);
+                e.Property(i => i.RegisterRedirectProvider).HasMaxLength(32);
                 e.Property(i => i.RowVersion).IsRowVersion();
             });
 

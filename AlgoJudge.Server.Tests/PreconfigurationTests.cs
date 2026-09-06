@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using AlgoJudge.Server.Authorization;
 using FileOwnerKind = AlgoJudge.Server.Database.Models.FileOwnerKind;
@@ -175,6 +176,84 @@ public class PreconfigurationTests(ServerFixture server) : IDisposable
     /// what this feature did.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// A file may name a provider that is not registered yet.
+    ///
+    /// <para>
+    /// **This is why the redirect is not validated where every other setting
+    /// would be.** A configuration file is read at a first start, and at a first
+    /// start no provider has been registered — so a check that the slug names one
+    /// would refuse every legitimate use of the key. What makes storing an
+    /// unresolvable slug safe is the other half: the answer the sign-in screen
+    /// reads is filtered against the providers actually on offer, so the redirect
+    /// simply does not begin until one exists.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task A_redirect_may_name_a_provider_that_is_not_registered_yet()
+    {
+        var directory = Directory_(Yaml("Before anybody registered",
+            "  signInRedirectProvider: \"university\""));
+        var (host, connectionString) = await FreshAsync(directory);
+
+        using var anonymous = host.CreateClient();
+        (await anonymous.GetAsync("/api/v1/health")).EnsureSuccessStatusCode();
+
+        // The column holds what the file said…
+        await using (var context = ScratchDatabase.Context(connectionString))
+        {
+            Assert.Equal("university", (await context.Instance.FirstAsync()).SignInRedirectProvider);
+        }
+
+        // …and the sign-in screen is told nothing, because there is nothing to
+        // send anybody to. A screen that acted on this would send every visitor
+        // to an address answering 404.
+        var instance = await anonymous.GetFromJsonAsync<JsonElement>("/api/v1/instance");
+        Assert.False(instance.TryGetProperty("signInRedirectProvider", out _));
+    }
+
+    /// <summary>
+    /// A redirect the file does not mention is left alone.
+    ///
+    /// <para>
+    /// The sibling of <see cref="A_setting_absent_from_the_file_is_left_alone"/>,
+    /// and it needs its own test because a string has a third state a flag does
+    /// not: **blank clears**. An apply that read an absent key the way it reads a
+    /// blank one would take the sign-in path off an installation whose file says
+    /// nothing about it — which is every installation that configured the
+    /// redirect from the panel.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Redirects_absent_from_the_file_are_left_alone()
+    {
+        var directory = Directory_(Yaml("Says nothing about redirects"));
+        var (host, connectionString) = await FreshAsync(directory);
+
+        using (var warm = host.CreateClient())
+        {
+            (await warm.GetAsync("/api/v1/health")).EnsureSuccessStatusCode();
+        }
+
+        await using (var seeded = ScratchDatabase.Context(connectionString))
+        {
+            var instance = await seeded.Instance.FirstAsync();
+            instance.SignInRedirectProvider = "set-from-the-panel";
+            instance.RegisterRedirectProvider = "also-from-the-panel";
+            await seeded.SaveChangesAsync();
+        }
+
+        using var admin = Operator(host);
+        await ReadAsync(await admin.PostAsync($"{Config}/apply", null));
+
+        await using var context = ScratchDatabase.Context(connectionString);
+        var after = await context.Instance.FirstAsync();
+
+        // Exactly what was there: not null, and not the empty string either.
+        Assert.Equal("set-from-the-panel", after.SignInRedirectProvider);
+        Assert.Equal("also-from-the-panel", after.RegisterRedirectProvider);
+    }
+
     private static async Task<int> WelcomeAsync(string connectionString)
     {
         await using var context = ScratchDatabase.Context(connectionString);

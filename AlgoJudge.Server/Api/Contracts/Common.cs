@@ -147,6 +147,29 @@ namespace AlgoJudge.Server.Api.Contracts
         /// </summary>
         public required IReadOnlyList<PublicProviderDto> Providers { get; init; }
 
+        /// <summary>
+        /// The provider the sign-in screen sends the browser straight to,
+        /// instead of drawing itself. Absent means it draws itself, which is
+        /// what an installation that never touched this has.
+        /// <para>
+        /// <b>It is always a member of <see cref="Providers"/>, or it is
+        /// absent.</b> The projection filters it against that very list, so a
+        /// screen may build a challenge address out of it without first asking
+        /// whether this Server would answer at the other end.
+        /// </para>
+        /// <para>
+        /// <b>What it discloses is one page load's worth.</b> The slug is
+        /// already on this answer beside its display name; the only new fact is
+        /// <i>that</i> this installation redirects, which anybody learns by
+        /// opening the sign-in screen once. Public for the same reason the
+        /// buttons are.
+        /// </para>
+        /// </summary>
+        public string? SignInRedirectProvider { get; init; }
+
+        /// <summary>The same, for the registration screen.</summary>
+        public string? RegisterRedirectProvider { get; init; }
+
         /// <summary>Whether a person may remove their own account from here.</summary>
         public required bool AccountDeletionEnabled { get; init; }
 

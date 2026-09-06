@@ -13363,6 +13363,14 @@
             },
             "nullable": true
           },
+          "signInRedirectProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "registerRedirectProvider": {
+            "type": "string",
+            "nullable": true
+          },
           "accountDeletionEnabled": {
             "type": "boolean"
           },
@@ -13453,6 +13461,14 @@
           },
           "seriesRestrictionsEnabled": {
             "type": "boolean",
+            "nullable": true
+          },
+          "signInRedirectProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "registerRedirectProvider": {
+            "type": "string",
             "nullable": true
           }
         },

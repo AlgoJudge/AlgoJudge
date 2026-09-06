@@ -98,6 +98,11 @@ namespace AlgoJudge.Server.Services
                 .Select(p => new PublicProviderDto { Slug = p.Slug, DisplayName = p.DisplayName })
                 .ToListAsync(ct);
 
+            // A redirect the buttons above do not also offer is not served. See
+            // where it is used, below, for why that is the whole safety of it.
+            string? InForce(string? slug) =>
+                slug is not null && providers.Any(p => p.Slug == slug) ? slug : null;
+
             return new InstanceInfoDto
             {
                 Providers = providers,
@@ -116,6 +121,25 @@ namespace AlgoJudge.Server.Services
                     .ToList() is { Count: > 0 } translations ? translations : null,
                 ShowLogo = instance.ShowLogo,
                 ShowLocalSignIn = instance.ShowLocalSignIn,
+
+                // **A redirect never names a provider this answer does not also
+                // offer.** The column keeps whatever an operator wrote; what
+                // travels is filtered against the very list the buttons are drawn
+                // from. So a provider disabled at nine in the morning stops
+                // redirecting at nine in the morning and the screen simply draws
+                // itself again — and re-enabling brings the redirect back without
+                // anybody having to remember what it was.
+                //
+                // This is the safety property and not tidiness: without it,
+                // disabling a provider would turn the sign-in screen into a
+                // permanent 404 for everybody who does not know `?admin=true`.
+                //
+                // It is also what lets pre-configuration state a slug before any
+                // provider exists — at a first start there are none, so nothing
+                // there could validate one.
+                SignInRedirectProvider = InForce(instance.SignInRedirectProvider),
+                RegisterRedirectProvider = InForce(instance.RegisterRedirectProvider),
+
                 Theme = await ThemeAsync(references, ct),
             };
         }

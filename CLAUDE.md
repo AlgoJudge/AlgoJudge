@@ -32,7 +32,14 @@ dotnet test    AlgoJudge.sln -c Release --no-build
 docker compose -f example-server-development-docker-compose.yaml up
 dotnet ef database update --project AlgoJudge.Server
 dotnet ef database update --project AlgoJudge.Server --context LtiDbContext
+dotnet ef migrations add <Name> --project AlgoJudge.Server --context ApplicationDbContext
 ```
+
+> **`migrations add` needs `--context`, and `database update` does not.**
+> Measured 2026-09-06: without it the command answers *"More than one DbContext
+> was found"* and writes nothing, which reads as the migration having been
+> created. The line below saying a command naming no context gets
+> `ApplicationDbContext` is true of `database update` only.
 
 > **The audit this section used to ask for is done** (2026-08-30). It said
 > "Docker for the development environment **if confirmed by the repository**"

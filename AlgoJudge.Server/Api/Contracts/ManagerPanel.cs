@@ -637,6 +637,29 @@ namespace AlgoJudge.Server.Api.Contracts
         /// </para>
         /// </summary>
         public bool? SeriesRestrictionsEnabled { get; init; }
+
+        /// <summary>
+        /// The slug of the provider the sign-in screen sends the browser straight
+        /// to. Blank clears it.
+        /// <para>
+        /// <b>Three states, and the C# says which is which.</b> Absent — the
+        /// property stays <c>null</c> — means <i>leave it alone</i>, for the
+        /// reason <see cref="ExternalJudgingEnabled"/> gives above. An
+        /// <b>empty string</b> clears it, and a slug sets it.
+        /// </para>
+        /// <para>
+        /// <b>That is deliberately not how <see cref="Name"/> reads</b>, where
+        /// absent and blank are one thing. A request written before this field
+        /// existed omits it, and reading that omission as "clear" would take a
+        /// working sign-in path off an installation while somebody was saving an
+        /// unrelated switch — and three such requests exist today, including the
+        /// one the manager panel sends.
+        /// </para>
+        /// </summary>
+        public string? SignInRedirectProvider { get; init; }
+
+        /// <summary>The same, for the registration screen. Absent leaves it alone.</summary>
+        public string? RegisterRedirectProvider { get; init; }
     }
 
     public record InstanceLogoInputDto
