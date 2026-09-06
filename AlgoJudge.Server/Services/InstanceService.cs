@@ -121,6 +121,7 @@ namespace AlgoJudge.Server.Services
                     .ToList() is { Count: > 0 } translations ? translations : null,
                 ShowLogo = instance.ShowLogo,
                 ShowLocalSignIn = instance.ShowLocalSignIn,
+                ShowHero = instance.ShowHero,
 
                 // **A redirect never names a provider this answer does not also
                 // offer.** The column keeps whatever an operator wrote; what

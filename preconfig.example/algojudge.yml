@@ -31,6 +31,7 @@ instance:
   requireConfirmedEmail: false
   showLogo: true
   showLocalSignIn: true
+  showHero: true
   accountDeletionEnabled: true
   externalJudgingEnabled: false
   seriesRestrictionsEnabled: true

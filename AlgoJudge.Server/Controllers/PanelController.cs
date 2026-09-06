@@ -555,6 +555,10 @@ namespace AlgoJudge.Server.Controllers
             {
                 instance.SeriesRestrictionsEnabled = restrictions;
             }
+            if (input.ShowHero is { } showHero)
+            {
+                instance.ShowHero = showHero;
+            }
 
             // `is { }` is the same "was it stated at all" test the two switches
             // above use, lifted to a string. Blank inside means cleared; absent

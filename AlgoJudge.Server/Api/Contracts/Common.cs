@@ -131,6 +131,13 @@ namespace AlgoJudge.Server.Api.Contracts
         public required bool ShowLocalSignIn { get; init; }
 
         /// <summary>
+        /// Whether the home page opens with the product's own introduction, for
+        /// a visitor who is not signed in. <b>The switch travels and the content
+        /// does not</b> — the words and the picture are the Client's.
+        /// </summary>
+        public required bool ShowHero { get; init; }
+
+        /// <summary>
         /// The identity providers this installation offers, for the buttons on
         /// the sign-in screen.
         /// <para>

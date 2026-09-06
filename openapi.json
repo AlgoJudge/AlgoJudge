@@ -13309,6 +13309,7 @@
           "requireConfirmedEmail",
           "requireEmail",
           "seriesRestrictionsEnabled",
+          "showHero",
           "showLocalSignIn",
           "showLogo"
         ],
@@ -13354,6 +13355,9 @@
             "type": "boolean"
           },
           "showLocalSignIn": {
+            "type": "boolean"
+          },
+          "showHero": {
             "type": "boolean"
           },
           "providers": {
@@ -13460,6 +13464,10 @@
             "nullable": true
           },
           "seriesRestrictionsEnabled": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "showHero": {
             "type": "boolean",
             "nullable": true
           },

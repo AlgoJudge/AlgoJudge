@@ -25,6 +25,7 @@ namespace AlgoJudge.Server.Preconfiguration
         public bool? RequireConfirmedEmail { get; set; }
         public bool? ShowLogo { get; set; }
         public bool? ShowLocalSignIn { get; set; }
+        public bool? ShowHero { get; set; }
         public bool? AccountDeletionEnabled { get; set; }
         public bool? ExternalJudgingEnabled { get; set; }
         public bool? SeriesRestrictionsEnabled { get; set; }

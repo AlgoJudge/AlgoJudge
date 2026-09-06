@@ -665,6 +665,29 @@ public class PreconfigurationTests(ServerFixture server) : IDisposable
         Assert.Contains("requireEmial", Flatten(refused));
     }
 
+    /// <summary>
+    /// A file may take the home introduction down at a first start.
+    /// <para>
+    /// <b>The direction that can be wrong without anybody noticing.</b> The flag
+    /// ships <c>true</c>, so a <c>Flag</c> call wired to the neighbouring
+    /// property leaves this one on — and the installation looks correct
+    /// everywhere except the one page nobody checks before opening the doors.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task A_file_may_take_the_home_introduction_down()
+    {
+        var directory = Directory_(Yaml("Quiet front page", "  showHero: false"));
+        var (host, connectionString) = await FreshAsync(directory);
+
+        using var anonymous = host.CreateClient();
+        (await anonymous.GetAsync("/api/v1/health")).EnsureSuccessStatusCode();
+
+        await using var context = ScratchDatabase.Context(connectionString);
+        var instance = await context.Instance.FirstAsync();
+        Assert.False(instance.ShowHero);
+    }
+
     private static string Flatten(Exception error) =>
         error.InnerException is { } inner ? $"{error.Message} {Flatten(inner)}" : error.Message;
 

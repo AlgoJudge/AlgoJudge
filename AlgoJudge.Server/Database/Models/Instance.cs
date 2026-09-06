@@ -148,6 +148,29 @@ namespace AlgoJudge.Server.Database.Models
         public bool ShowLocalSignIn { get; set; } = true;
 
         /// <summary>
+        /// Whether the home page opens with the product's own introduction, for
+        /// a visitor who is not signed in.
+        /// <para>
+        /// <b>Above the installation's own document, never instead of it.</b>
+        /// The welcome document is what an installation says about itself; this
+        /// is what the software says about itself. An installation that has
+        /// written its own front page turns this off rather than editing it,
+        /// and gets its own words with nothing above them.
+        /// </para>
+        /// <para>
+        /// <b>The switch is here and not one word of the content is.</b> The
+        /// text, the picture and the two links are the Client's, translated
+        /// with the rest of its interface — so they change in a release of the
+        /// Client and nothing here has to know.
+        /// </para>
+        /// <para>
+        /// Defaults to <c>true</c>: an installation with no document of its own
+        /// otherwise offers a signed-out visitor an empty page.
+        /// </para>
+        /// </summary>
+        public bool ShowHero { get; set; } = true;
+
+        /// <summary>
         /// The slug of the provider the sign-in screen sends the browser straight
         /// to, instead of drawing itself. <c>null</c> means it draws itself,
         /// which is what an installation that never touches this has.

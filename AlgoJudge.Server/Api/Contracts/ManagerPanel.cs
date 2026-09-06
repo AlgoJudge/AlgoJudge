@@ -639,6 +639,12 @@ namespace AlgoJudge.Server.Api.Contracts
         public bool? SeriesRestrictionsEnabled { get; init; }
 
         /// <summary>
+        /// Whether the home page opens with the product's own introduction.
+        /// Absent leaves it alone, for the reason above.
+        /// </summary>
+        public bool? ShowHero { get; init; }
+
+        /// <summary>
         /// The slug of the provider the sign-in screen sends the browser straight
         /// to. Blank clears it.
         /// <para>

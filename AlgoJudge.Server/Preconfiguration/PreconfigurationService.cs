@@ -139,6 +139,8 @@ namespace AlgoJudge.Server.Preconfiguration
                 stated.ShowLogo, value => instance.ShowLogo = value);
             Flag("instance.showLocalSignIn", instance.ShowLocalSignIn,
                 stated.ShowLocalSignIn, value => instance.ShowLocalSignIn = value);
+            Flag("instance.showHero", instance.ShowHero,
+                stated.ShowHero, value => instance.ShowHero = value);
             Flag("instance.accountDeletionEnabled", instance.AccountDeletionEnabled,
                 stated.AccountDeletionEnabled, value => instance.AccountDeletionEnabled = value);
             Flag("instance.externalJudgingEnabled", instance.ExternalJudgingEnabled,
