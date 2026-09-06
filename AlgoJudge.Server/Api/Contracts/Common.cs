@@ -75,6 +75,9 @@ namespace AlgoJudge.Server.Api.Contracts
 
     public record InstanceLogoDto
     {
+        /// <summary>The reference. An address is the caller's to build.</summary>
+        public required string FileId { get; init; }
+        /// <summary>Being replaced by <see cref="FileId"/>.</summary>
         public required string Url { get; init; }
         public required string MimeType { get; init; }
         public required long SizeBytes { get; init; }
@@ -263,6 +266,9 @@ namespace AlgoJudge.Server.Api.Contracts
         public required int Weight { get; init; }
         /// <summary><c>normal</c> or <c>italic</c>.</summary>
         public required string Style { get; init; }
+        /// <summary>The reference. An address is the caller's to build.</summary>
+        public required string FileId { get; init; }
+        /// <summary>Being replaced by <see cref="FileId"/>.</summary>
         public required string Url { get; init; }
         public required string Sha256 { get; init; }
         public required long SizeBytes { get; init; }

@@ -11975,6 +11975,7 @@
       },
       "AttachmentDto": {
         "required": [
+          "fileId",
           "mimeType",
           "name",
           "sha256",
@@ -11994,6 +11995,10 @@
           "sizeBytes": {
             "type": "integer",
             "format": "int64"
+          },
+          "fileId": {
+            "type": "string",
+            "nullable": true
           },
           "url": {
             "type": "string",
@@ -13270,6 +13275,7 @@
       "InstanceFontDto": {
         "required": [
           "family",
+          "fileId",
           "name",
           "sha256",
           "sizeBytes",
@@ -13292,6 +13298,10 @@
             "format": "int32"
           },
           "style": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileId": {
             "type": "string",
             "nullable": true
           },
@@ -13415,6 +13425,7 @@
       },
       "InstanceLogoDto": {
         "required": [
+          "fileId",
           "mimeType",
           "sha256",
           "sizeBytes",
@@ -13422,6 +13433,10 @@
         ],
         "type": "object",
         "properties": {
+          "fileId": {
+            "type": "string",
+            "nullable": true
+          },
           "url": {
             "type": "string",
             "nullable": true
@@ -15992,6 +16007,10 @@
             "format": "int64"
           },
           "sha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileId": {
             "type": "string",
             "nullable": true
           },

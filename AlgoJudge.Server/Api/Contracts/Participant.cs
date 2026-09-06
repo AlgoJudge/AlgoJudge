@@ -182,6 +182,12 @@ namespace AlgoJudge.Server.Api.Contracts
         public required string Name { get; init; }
         public required string MimeType { get; init; }
         public required long SizeBytes { get; init; }
+        /// <summary>
+        /// The reference. An address is the caller's to build, from the base it
+        /// already holds — see <c>docs/specs/FILE_API.md</c>.
+        /// </summary>
+        public required string FileId { get; init; }
+        /// <summary>Being replaced by <see cref="FileId"/>.</summary>
         public required string Url { get; init; }
         public required string Sha256 { get; init; }
     }

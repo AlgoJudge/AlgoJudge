@@ -203,6 +203,7 @@ namespace AlgoJudge.Server.Api
             Name = reference.Name,
             MimeType = reference.File?.MimeType ?? "application/octet-stream",
             SizeBytes = reference.File?.SizeBytes ?? 0,
+            FileId = Contracts.Wire.Id(reference.FileId),
             Url = url,
             Sha256 = reference.File?.Sha256 ?? "",
         };
@@ -376,6 +377,7 @@ namespace AlgoJudge.Server.Api
                         MimeType = f.File?.MimeType ?? "application/octet-stream",
                         SizeBytes = f.File?.SizeBytes ?? 0,
                         Sha256 = f.File?.Sha256 ?? "",
+                        FileId = Contracts.Wire.Id(f.FileId),
                         Url = url(f),
                     })
                     .ToList(),

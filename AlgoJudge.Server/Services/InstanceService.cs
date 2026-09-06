@@ -204,6 +204,7 @@ namespace AlgoJudge.Server.Services
                             Family = face.Family!,
                             Weight = face.Weight ?? 400,
                             Style = face.Style ?? "normal",
+                            FileId = Wire.Id(faces[face.File!].FileId),
                             Url = $"/api/v1/files/{Wire.Id(faces[face.File!].FileId)}",
                             Sha256 = faces[face.File!].File?.Sha256 ?? "",
                             SizeBytes = faces[face.File!].File?.SizeBytes ?? 0,
@@ -244,6 +245,7 @@ namespace AlgoJudge.Server.Services
 
         private static InstanceLogoDto Logo(FileReference reference) => new()
         {
+            FileId = Wire.Id(reference.FileId),
             Url = $"/api/v1/files/{Wire.Id(reference.FileId)}",
             MimeType = reference.File?.MimeType ?? "image/svg+xml",
             SizeBytes = reference.File?.SizeBytes ?? 0,
