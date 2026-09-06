@@ -586,6 +586,46 @@ namespace AlgoJudge.Server.Api.Contracts
         public required IReadOnlyList<string> Hosts { get; init; }
     }
 
+    /// <summary>
+    /// One redirect column, as it is rather than as it is served.
+    /// <para>
+    /// <c>getInstanceInfo</c> answers <i>what should a signed-out screen do
+    /// now</i>, so it names a slug only while that provider is enabled. The
+    /// panel's form asks a different question — <i>what is in the column</i> —
+    /// and answering it from the first one is how the form came to show
+    /// <c>None</c> for a setting that was there.
+    /// </para>
+    /// </summary>
+    public record InstanceRedirectDto
+    {
+        /// <summary>What the column holds. Absent means no redirect is set.</summary>
+        public string? Slug { get; init; }
+
+        /// <summary>
+        /// The name of the provider registered under that slug, enabled or not.
+        /// Absent when none is: pre-configuration may name a slug before any
+        /// provider exists, and this answer has to be able to say so.
+        /// </summary>
+        public string? DisplayName { get; init; }
+
+        /// <summary>
+        /// <c>none</c>, <c>inForce</c>, <c>disabled</c> or <c>unregistered</c>.
+        /// <para>
+        /// Exhaustive rather than inferred: the panel has a different sentence
+        /// for each, and reading <c>unregistered</c> out of an absent
+        /// <see cref="DisplayName"/> is the cleverness that rots. <c>inForce</c>
+        /// is the one state in which the public answer names this slug too.
+        /// </para>
+        /// </summary>
+        public required string State { get; init; }
+    }
+
+    public record InstanceRedirectsDto
+    {
+        public required InstanceRedirectDto SignIn { get; init; }
+        public required InstanceRedirectDto Register { get; init; }
+    }
+
     public record ExternalContentInputDto
     {
         /// <summary>The whole list. An empty one means this installation fetches nothing.</summary>
