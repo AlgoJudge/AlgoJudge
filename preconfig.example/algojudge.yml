@@ -31,9 +31,21 @@ instance:
   requireConfirmedEmail: false
   showLogo: true
   showLocalSignIn: true
+  showHero: true
   accountDeletionEnabled: true
   externalJudgingEnabled: false
   seriesRestrictionsEnabled: true
+
+  # A provider's slug here sends the sign-in screen (or the registration screen)
+  # straight to that provider instead of drawing itself. Empty is off, which is
+  # how it ships, and `?admin=true` brings the local screen back for whoever
+  # needs it.
+  #
+  # It may name a provider that is not registered yet: nothing happens until one
+  # exists and is enabled, which is what lets this file be read at a first start,
+  # before anybody has registered anything.
+  signInRedirectProvider: ""
+  registerRedirectProvider: ""
 
   # The whole list, replaced rather than added to. An empty list means this
   # installation fetches nothing from anywhere.

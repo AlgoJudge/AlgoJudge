@@ -555,6 +555,24 @@ namespace AlgoJudge.Server.Controllers
             {
                 instance.SeriesRestrictionsEnabled = restrictions;
             }
+            if (input.ShowHero is { } showHero)
+            {
+                instance.ShowHero = showHero;
+            }
+
+            // `is { }` is the same "was it stated at all" test the two switches
+            // above use, lifted to a string. Blank inside means cleared; absent
+            // never reaches here.
+            if (input.SignInRedirectProvider is { } signInRedirect)
+            {
+                instance.SignInRedirectProvider =
+                    await RedirectProviderAsync(signInRedirect, "signInRedirect", ct);
+            }
+            if (input.RegisterRedirectProvider is { } registerRedirect)
+            {
+                instance.RegisterRedirectProvider =
+                    await RedirectProviderAsync(registerRedirect, "registerRedirect", ct);
+            }
 
             // **This endpoint replaces the whole object**, and since 2026-08-28
             // the panel is not the only writer — `aj-admin config apply` writes
@@ -572,6 +590,44 @@ namespace AlgoJudge.Server.Controllers
             }
 
             return await AnnounceAsync(ct);
+        }
+
+        /// <summary>
+        /// A redirect setting, normalised and refused.
+        /// <para>
+        /// <b>One check, and it is existence rather than shape.</b> A slug that is
+        /// not a slug cannot be in the table — the provider service saw to that on
+        /// the way in — so "no enabled provider is registered under this" covers
+        /// the pattern as well, and says something more useful about a typo than a
+        /// second copy of a regular expression would.
+        /// </para>
+        /// <para>
+        /// <b><c>Enabled</c> is the half that matters.</b> The screen sends the
+        /// browser to that provider's challenge, and that action answers 404 for a
+        /// provider the registry does not hold — which is every disabled one.
+        /// Letting a disabled slug be written here would put every visitor on a
+        /// dead end with no way back to the form except knowing about
+        /// <c>?admin=true</c>.
+        /// </para>
+        /// </summary>
+        private async Task<string?> RedirectProviderAsync(
+            string stated, string field, CancellationToken ct)
+        {
+            var slug = stated.Trim().ToLowerInvariant();
+            if (slug.Length == 0)
+            {
+                return null;
+            }
+
+            if (!await context.IdentityProviders.AnyAsync(p => p.Slug == slug && p.Enabled, ct))
+            {
+                throw new ValidationException(
+                    $"No enabled identity provider is registered under \"{slug}\". The sign-in "
+                    + "screen would send everybody to an address this Server answers 404 to.",
+                    $"instance.{field}.unknown");
+            }
+
+            return slug;
         }
 
         [HttpPut("logo")]

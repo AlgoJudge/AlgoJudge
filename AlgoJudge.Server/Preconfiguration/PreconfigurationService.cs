@@ -139,12 +139,27 @@ namespace AlgoJudge.Server.Preconfiguration
                 stated.ShowLogo, value => instance.ShowLogo = value);
             Flag("instance.showLocalSignIn", instance.ShowLocalSignIn,
                 stated.ShowLocalSignIn, value => instance.ShowLocalSignIn = value);
+            Flag("instance.showHero", instance.ShowHero,
+                stated.ShowHero, value => instance.ShowHero = value);
             Flag("instance.accountDeletionEnabled", instance.AccountDeletionEnabled,
                 stated.AccountDeletionEnabled, value => instance.AccountDeletionEnabled = value);
             Flag("instance.externalJudgingEnabled", instance.ExternalJudgingEnabled,
                 stated.ExternalJudgingEnabled, value => instance.ExternalJudgingEnabled = value);
             Flag("instance.seriesRestrictionsEnabled", instance.SeriesRestrictionsEnabled,
                 stated.SeriesRestrictionsEnabled, value => instance.SeriesRestrictionsEnabled = value);
+
+            // **No check that the provider exists, and that is not an oversight.**
+            // A file is read at a first start, where no provider has been
+            // registered yet — every legitimate use of these two keys would be
+            // refused by a check. It is safe because the read side filters: a slug
+            // naming a provider that is not there and enabled is simply not
+            // served, so the redirect begins the day the provider does.
+            Compare("instance.signInRedirectProvider", instance.SignInRedirectProvider ?? "",
+                stated.SignInRedirectProvider,
+                value => instance.SignInRedirectProvider = value.Length == 0 ? null : value);
+            Compare("instance.registerRedirectProvider", instance.RegisterRedirectProvider ?? "",
+                stated.RegisterRedirectProvider,
+                value => instance.RegisterRedirectProvider = value.Length == 0 ? null : value);
 
             if (stated.ExternalFetchHosts is { } hosts)
             {

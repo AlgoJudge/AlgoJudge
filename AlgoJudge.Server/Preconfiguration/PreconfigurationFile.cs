@@ -25,9 +25,12 @@ namespace AlgoJudge.Server.Preconfiguration
         public bool? RequireConfirmedEmail { get; set; }
         public bool? ShowLogo { get; set; }
         public bool? ShowLocalSignIn { get; set; }
+        public bool? ShowHero { get; set; }
         public bool? AccountDeletionEnabled { get; set; }
         public bool? ExternalJudgingEnabled { get; set; }
         public bool? SeriesRestrictionsEnabled { get; set; }
+        public string? SignInRedirectProvider { get; set; }
+        public string? RegisterRedirectProvider { get; set; }
         public List<string>? ExternalFetchHosts { get; set; }
     }
 
@@ -306,6 +309,10 @@ namespace AlgoJudge.Server.Preconfiguration
         private static InstanceSection Expanded(InstanceSection instance)
         {
             instance.Name = Expand(instance.Name, "instance.name");
+            instance.SignInRedirectProvider =
+                Expand(instance.SignInRedirectProvider, "instance.signInRedirectProvider");
+            instance.RegisterRedirectProvider =
+                Expand(instance.RegisterRedirectProvider, "instance.registerRedirectProvider");
             instance.ExternalFetchHosts = instance.ExternalFetchHosts
                 ?.Select((host, index) => Expand(host, $"instance.externalFetchHosts[{index}]")!)
                 .ToList();

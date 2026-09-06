@@ -425,6 +425,81 @@ public class EndToEndTests(ServerFixture server)
     }
 
     /// <summary>
+    /// The home page's introduction ships on, and an installation with words of
+    /// its own can take it down.
+    /// <para>
+    /// <b>The Server holds a switch and not one word of content.</b> Nothing
+    /// here names a heading, a picture or a link, because none of them is the
+    /// Server's — and that, rather than the boolean, is the property worth
+    /// keeping. A field that had to carry the text would make every wording
+    /// change a release of two components instead of one.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task The_home_introduction_ships_on_and_can_be_taken_down()
+    {
+        var admin = await Sign.InAsync(server, Seeder.DevAdminLogin, Seeder.DevAdminPassword);
+        var anonymous = server.CreateClient();
+
+        // The default an installation that never touched this has.
+        Assert.True((await anonymous.GetFromJsonAsync<JsonElement>("/api/v1/instance"))
+            .GetProperty("showHero").GetBoolean());
+
+        await Sign.Succeeded(await admin.PutAsJsonAsync("/api/v1/instance", HomeIntroduction(false)));
+        Assert.False((await anonymous.GetFromJsonAsync<JsonElement>("/api/v1/instance"))
+            .GetProperty("showHero").GetBoolean());
+
+        // Put back, because the fixture is shared and the assertion above is
+        // about a default rather than about whichever test ran last.
+        await Sign.Succeeded(await admin.PutAsJsonAsync("/api/v1/instance", HomeIntroduction(true)));
+    }
+
+    /// <summary>
+    /// <b>Silence is not a decision, and here it would be a loud one.</b> The
+    /// settings endpoint replaces the whole object, so every caller written
+    /// before this field omits it — including the manager panel's own form. The
+    /// flag ships <c>true</c>, so reading absence as a value would switch the
+    /// introduction back <i>on</i> for an installation that had taken it down,
+    /// while somebody was saving something else entirely.
+    /// </summary>
+    [Fact]
+    public async Task Saving_other_settings_does_not_bring_the_home_introduction_back()
+    {
+        var admin = await Sign.InAsync(server, Seeder.DevAdminLogin, Seeder.DevAdminPassword);
+        var anonymous = server.CreateClient();
+
+        await Sign.Succeeded(await admin.PutAsJsonAsync("/api/v1/instance", HomeIntroduction(false)));
+
+        // A body from before the field existed: six keys, and no `showHero`.
+        await Sign.Succeeded(await admin.PutAsJsonAsync("/api/v1/instance", new
+        {
+            localRegistrationEnabled = false,
+            requireEmail = false,
+            requireConfirmedEmail = false,
+            showLogo = true,
+            showLocalSignIn = true,
+            accountDeletionEnabled = true,
+        }));
+
+        Assert.False((await anonymous.GetFromJsonAsync<JsonElement>("/api/v1/instance"))
+            .GetProperty("showHero").GetBoolean());
+
+        await Sign.Succeeded(await admin.PutAsJsonAsync("/api/v1/instance", HomeIntroduction(true)));
+    }
+
+    /// <summary>The settings body every other field of which is left as it ships.</summary>
+    private static object HomeIntroduction(bool shown) => new
+    {
+        localRegistrationEnabled = false,
+        requireEmail = false,
+        requireConfirmedEmail = false,
+        showLogo = true,
+        showLocalSignIn = true,
+        accountDeletionEnabled = true,
+        showHero = shown,
+    };
+
+    /// <summary>
     /// <b>The trailing slash is not a variation, it is the bug.</b> The guard
     /// matched with <c>EndsWith</c> while endpoint routing normalises a trailing
     /// slash, so <c>/identity/register/</c> reached the framework's own register

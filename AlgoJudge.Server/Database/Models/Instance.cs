@@ -148,6 +148,60 @@ namespace AlgoJudge.Server.Database.Models
         public bool ShowLocalSignIn { get; set; } = true;
 
         /// <summary>
+        /// Whether the home page opens with the product's own introduction, for
+        /// a visitor who is not signed in.
+        /// <para>
+        /// <b>Above the installation's own document, never instead of it.</b>
+        /// The welcome document is what an installation says about itself; this
+        /// is what the software says about itself. An installation that has
+        /// written its own front page turns this off rather than editing it,
+        /// and gets its own words with nothing above them.
+        /// </para>
+        /// <para>
+        /// <b>The switch is here and not one word of the content is.</b> The
+        /// text, the picture and the two links are the Client's, translated
+        /// with the rest of its interface — so they change in a release of the
+        /// Client and nothing here has to know.
+        /// </para>
+        /// <para>
+        /// Defaults to <c>true</c>: an installation with no document of its own
+        /// otherwise offers a signed-out visitor an empty page.
+        /// </para>
+        /// </summary>
+        public bool ShowHero { get; set; } = true;
+
+        /// <summary>
+        /// The slug of the provider the sign-in screen sends the browser straight
+        /// to, instead of drawing itself. <c>null</c> means it draws itself,
+        /// which is what an installation that never touches this has.
+        /// <para>
+        /// <b>A slug and not an address.</b> The screen builds the challenge URL
+        /// from it, so the <c>returnUrl</c> a person was heading for survives the
+        /// round trip — a stored address could not carry one, and a deep link or
+        /// an LTI launch would land everybody on the front page instead. It also
+        /// means this cannot become an open redirect: the only addresses it can
+        /// produce are this Server's own.
+        /// </para>
+        /// <para>
+        /// <b>The column keeps what an operator wrote; what is served is
+        /// filtered.</b> A slug naming a provider that is disabled or gone is not
+        /// advertised — see <c>InstanceService</c> — so disabling a provider stops
+        /// the redirect the same minute rather than leaving every visitor on a
+        /// 404, and re-enabling it brings the redirect back without anybody
+        /// having to remember what it was.
+        /// </para>
+        /// </summary>
+        public string? SignInRedirectProvider { get; set; }
+
+        /// <summary>
+        /// The same, for the registration screen. It leads to the provider's own
+        /// sign-in page, where whoever offers registration offers it — there is
+        /// no way to link a provider's registration form directly without
+        /// starting an authorization request first.
+        /// </summary>
+        public string? RegisterRedirectProvider { get; set; }
+
+        /// <summary>
         /// Whether a person may remove their own account from the Client.
         /// <para>
         /// One setting for both user-facing channels — the local form and the
