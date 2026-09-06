@@ -256,9 +256,16 @@ public class ThemeTests(ServerFixture server)
         await Sign.Succeeded(await admin.DeleteAsync($"{Instance}/fonts/in-use-400.woff2"));
     }
 
-    /// <summary>A face travels with an address this Server built, never one anybody typed.</summary>
+    /// <summary>
+    /// A face travels as a **reference**, never as an address anybody typed.
+    /// <para>
+    /// It used to travel as an address this Server built, which was safe in the
+    /// same way and wrong in another: it was relative to this Server's origin,
+    /// and an application served from elsewhere resolved it against itself.
+    /// </para>
+    /// </summary>
     [Fact]
-    public async Task A_declared_face_reaches_the_reader_as_an_address()
+    public async Task A_declared_face_reaches_the_reader_as_a_reference()
     {
         var admin = await Sign.InAsync(server, Seeder.DevAdminLogin, Seeder.DevAdminPassword);
 
@@ -284,12 +291,13 @@ public class ThemeTests(ServerFixture server)
         Assert.Equal("Reader", face.GetProperty("family").GetString());
         Assert.Equal(700, face.GetProperty("weight").GetInt32());
         Assert.Equal("normal", face.GetProperty("style").GetString());
-        Assert.Equal($"/api/v1/files/{file}", face.GetProperty("url").GetString());
+        Assert.Equal(file, face.GetProperty("fileId").GetString());
+        Assert.False(face.TryGetProperty("url", out _), "a face names its file and no address");
 
         // And it is fetchable by somebody who has not signed in, because that is
         // who the login screen is for.
         using var anonymous = server.CreateClient();
-        var fetched = await anonymous.GetAsync(face.GetProperty("url").GetString());
+        var fetched = await anonymous.GetAsync($"/api/v1/files/{face.GetProperty("fileId").GetString()}");
         await Sign.Succeeded(fetched);
 
         await Sign.Succeeded(await admin.DeleteAsync($"{Instance}/theme"));

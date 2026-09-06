@@ -198,12 +198,12 @@ namespace AlgoJudge.Server.Api
             SizeBytes = reference.File?.SizeBytes ?? 0,
         };
 
-        public static AttachmentDto Attachment(FileReference reference, string url) => new()
+        public static AttachmentDto Attachment(FileReference reference) => new()
         {
             Name = reference.Name,
             MimeType = reference.File?.MimeType ?? "application/octet-stream",
             SizeBytes = reference.File?.SizeBytes ?? 0,
-            Url = url,
+            FileId = Contracts.Wire.Id(reference.FileId),
             Sha256 = reference.File?.Sha256 ?? "",
         };
 
@@ -358,7 +358,7 @@ namespace AlgoJudge.Server.Api
             };
 
         public static ManagedProblemVersionDto ManagedVersion(
-            ProblemVersion version, string? createdByName, Func<FileReference, string?> url) => new()
+            ProblemVersion version, string? createdByName) => new()
             {
                 Id = Contracts.Wire.Id(version.Id),
                 Version = version.Version,
@@ -376,7 +376,7 @@ namespace AlgoJudge.Server.Api
                         MimeType = f.File?.MimeType ?? "application/octet-stream",
                         SizeBytes = f.File?.SizeBytes ?? 0,
                         Sha256 = f.File?.Sha256 ?? "",
-                        Url = url(f),
+                        FileId = Contracts.Wire.Id(f.FileId),
                     })
                     .ToList(),
             };

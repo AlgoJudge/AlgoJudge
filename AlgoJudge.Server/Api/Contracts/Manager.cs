@@ -388,7 +388,11 @@ namespace AlgoJudge.Server.Api.Contracts
         public required string MimeType { get; init; }
         public required long SizeBytes { get; init; }
         public required string Sha256 { get; init; }
-        public string? Url { get; init; }
+        /// <summary>
+        /// The reference. Absent until the Server has stored the bytes, which is
+        /// what a version being prepared looks like.
+        /// </summary>
+        public string? FileId { get; init; }
     }
 
     public record ManagedProblemVersionDto

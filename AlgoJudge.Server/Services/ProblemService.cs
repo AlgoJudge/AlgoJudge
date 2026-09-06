@@ -347,7 +347,7 @@ namespace AlgoJudge.Server.Services
                 .Include(v => v.Files).ThenInclude(f => f.File)
                 .FirstAsync(v => v.Id == version.Id, ct);
 
-            return Projections.ManagedVersion(stored, Projections.DisplayName(user), _ => null);
+            return Projections.ManagedVersion(stored, Projections.DisplayName(user));
         }
 
         public async Task<ManagedProblemDto> GetAsync(Guid id, CancellationToken ct)
@@ -589,8 +589,7 @@ namespace AlgoJudge.Server.Services
 
             return versions.Select(v => Projections.ManagedVersion(
                 v,
-                v.CreatedBy is null ? null : Projections.DisplayName(v.CreatedBy),
-                file => $"/api/v1/files/{Wire.Id(file.FileId)}")).ToList();
+                v.CreatedBy is null ? null : Projections.DisplayName(v.CreatedBy))).ToList();
         }
 
         public async Task<IReadOnlyList<StatementRefDto>> ContentAsync(
@@ -717,7 +716,7 @@ namespace AlgoJudge.Server.Services
                     .Select(Projections.Statement).ToList(),
                 Attachments = files
                     .Where(f => !PackageNames.IsStatement(f.Name))
-                    .Select(f => Projections.Attachment(f, $"/api/v1/files/{Wire.Id(f.FileId)}"))
+                    .Select(Projections.Attachment)
                     .ToList(),
                 Status = Scoring.Status(mine, scale),
                 BestScore = Scoring.Rescale(scale, maxPoints),

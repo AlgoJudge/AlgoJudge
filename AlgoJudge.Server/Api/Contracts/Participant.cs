@@ -182,7 +182,17 @@ namespace AlgoJudge.Server.Api.Contracts
         public required string Name { get; init; }
         public required string MimeType { get; init; }
         public required long SizeBytes { get; init; }
-        public required string Url { get; init; }
+        /// <summary>
+        /// The reference, and the only one. An address is the caller's to build,
+        /// from the base it already holds — see <c>docs/specs/FILE_API.md</c>.
+        /// <para>
+        /// This carried a formed <c>Url</c> instead, relative to this Server's
+        /// own origin. It was correct for the Server and wrong in every
+        /// <c>&lt;img src&gt;</c> that received it: an application served from
+        /// anywhere else asked itself for the bytes.
+        /// </para>
+        /// </summary>
+        public required string FileId { get; init; }
         public required string Sha256 { get; init; }
     }
 
