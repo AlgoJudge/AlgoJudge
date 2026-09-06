@@ -393,8 +393,6 @@ namespace AlgoJudge.Server.Api.Contracts
         /// what a version being prepared looks like.
         /// </summary>
         public string? FileId { get; init; }
-        /// <summary>Being replaced by <see cref="FileId"/>.</summary>
-        public string? Url { get; init; }
     }
 
     public record ManagedProblemVersionDto

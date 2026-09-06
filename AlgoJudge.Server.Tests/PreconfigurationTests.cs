@@ -467,7 +467,7 @@ public class PreconfigurationTests(ServerFixture server) : IDisposable
 
         var face = theme.GetProperty("fonts").EnumerateArray().Single();
         Assert.Equal("example-400.woff2", face.GetProperty("name").GetString());
-        Assert.StartsWith("/api/v1/files/", face.GetProperty("url").GetString());
+        Assert.False(string.IsNullOrEmpty(face.GetProperty("fileId").GetString()));
 
         // And a second walk finds nothing to do. Publishing *adds* a revision,
         // so a comparison that did not hold here would grow the theme's history

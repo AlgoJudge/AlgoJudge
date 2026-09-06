@@ -11979,8 +11979,7 @@
           "mimeType",
           "name",
           "sha256",
-          "sizeBytes",
-          "url"
+          "sizeBytes"
         ],
         "type": "object",
         "properties": {
@@ -11997,10 +11996,6 @@
             "format": "int64"
           },
           "fileId": {
-            "type": "string",
-            "nullable": true
-          },
-          "url": {
             "type": "string",
             "nullable": true
           },
@@ -13280,7 +13275,6 @@
           "sha256",
           "sizeBytes",
           "style",
-          "url",
           "weight"
         ],
         "type": "object",
@@ -13302,10 +13296,6 @@
             "nullable": true
           },
           "fileId": {
-            "type": "string",
-            "nullable": true
-          },
-          "url": {
             "type": "string",
             "nullable": true
           },
@@ -13428,16 +13418,11 @@
           "fileId",
           "mimeType",
           "sha256",
-          "sizeBytes",
-          "url"
+          "sizeBytes"
         ],
         "type": "object",
         "properties": {
           "fileId": {
-            "type": "string",
-            "nullable": true
-          },
-          "url": {
             "type": "string",
             "nullable": true
           },
@@ -16011,10 +15996,6 @@
             "nullable": true
           },
           "fileId": {
-            "type": "string",
-            "nullable": true
-          },
-          "url": {
             "type": "string",
             "nullable": true
           }
