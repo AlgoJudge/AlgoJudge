@@ -500,7 +500,7 @@ public class IdentityProviderTests(ServerFixture server)
         accountDeletionEnabled = true,
     };
 
-    /// <summary>The same, plus a redirect. Blank clears it.</summary>
+    /// <summary>The same, plus a sign-in redirect. Blank clears it.</summary>
     private static object SettingsRedirecting(string slug) => new
     {
         localRegistrationEnabled = false,
@@ -511,6 +511,45 @@ public class IdentityProviderTests(ServerFixture server)
         accountDeletionEnabled = true,
         signInRedirectProvider = slug,
     };
+
+    /// <summary>
+    /// Both columns at once.
+    /// <para>
+    /// Stated separately because the two are separate: an installation may take
+    /// its sign-ins from a directory and still run its own sign-ups. Nothing
+    /// touched the register column before this overload existed.
+    /// </para>
+    /// </summary>
+    private static object SettingsRedirecting(string slug, string register) => new
+    {
+        localRegistrationEnabled = false,
+        requireEmail = false,
+        requireConfirmedEmail = false,
+        showLogo = true,
+        showLocalSignIn = true,
+        accountDeletionEnabled = true,
+        signInRedirectProvider = slug,
+        registerRedirectProvider = register,
+    };
+
+    /// <summary>The panel's own read of the two columns, unfiltered.</summary>
+    private static async Task<JsonElement> RedirectsAsync(HttpClient client)
+    {
+        var response = await client.GetAsync("/api/v1/instance/redirects");
+        await Sign.Succeeded(response);
+        return await response.Content.ReadFromJsonAsync<JsonElement>();
+    }
+
+    /// <summary>One half of that answer. Absent is a real answer for two of three.</summary>
+    private static (string State, string? Slug, string? Name) Half(
+        JsonElement redirects, string which)
+    {
+        var half = redirects.GetProperty(which);
+        return (
+            half.GetProperty("state").GetString()!,
+            half.TryGetProperty("slug", out var slug) ? slug.GetString() : null,
+            half.TryGetProperty("displayName", out var name) ? name.GetString() : null);
+    }
 
     /// <summary>Absent is a real answer here, so this must not be a GetProperty.</summary>
     private static string? RedirectOn(JsonElement instance) =>
@@ -672,6 +711,175 @@ public class IdentityProviderTests(ServerFixture server)
         // Left as it was found, so nothing after this reads a redirect it did not set.
         await Sign.Succeeded(
             await admin.PutAsJsonAsync("/api/v1/instance", SettingsRedirecting("")));
+    }
+
+    /// <summary>
+    /// **The panel is told what the public answer withholds.**
+    /// <para>
+    /// The screen that writes these two columns has to be able to read them, and
+    /// `getInstanceInfo` cannot tell it: that answer is filtered to what a
+    /// signed-out visitor should act on. Both halves are asserted here, in one
+    /// test, so neither can be relaxed without the other going red.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task The_panel_is_told_the_redirect_the_public_answer_hides()
+    {
+        var admin = await Sign.InAsync(server, Seeder.DevAdminLogin, Seeder.DevAdminPassword);
+        var anonymous = server.CreateClient();
+
+        var created = await admin.PostAsJsonAsync("/api/v1/identity/providers",
+            Registration("panel-reads-it"));
+        await Sign.Succeeded(created);
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString();
+
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            "/api/v1/instance", SettingsRedirecting("panel-reads-it")));
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            $"/api/v1/identity/providers/{id}", Provider("panel-reads-it", enabled: false)));
+
+        var (state, slug, name) = Half(await RedirectsAsync(admin), "signIn");
+        Assert.Equal("disabled", state);
+        Assert.Equal("panel-reads-it", slug);
+        Assert.Equal("University SSO", name);
+
+        // The other half of the same fact: a visitor still learns nothing.
+        Assert.Null(RedirectOn(await anonymous.GetFromJsonAsync<JsonElement>("/api/v1/instance")));
+
+        await Sign.Succeeded(
+            await admin.PutAsJsonAsync("/api/v1/instance", SettingsRedirecting("")));
+    }
+
+    /// <summary>
+    /// **Four states, and each reported as itself.**
+    /// <para>
+    /// `unregistered` is the one that matters and the one a shortcut would lose:
+    /// pre-configuration writes a slug before any provider exists, so an
+    /// installation arrives in that state at its first start. Computing the
+    /// answer from `Enabled` alone collapses it into `disabled` and the screen
+    /// says something false about a provider nobody has registered.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Every_state_a_redirect_can_be_in_is_reported_as_itself()
+    {
+        var admin = await Sign.InAsync(server, Seeder.DevAdminLogin, Seeder.DevAdminPassword);
+
+        Assert.Equal("none", Half(await RedirectsAsync(admin), "signIn").State);
+
+        var created = await admin.PostAsJsonAsync("/api/v1/identity/providers",
+            Registration("four-states"));
+        await Sign.Succeeded(created);
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString();
+
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            "/api/v1/instance", SettingsRedirecting("four-states", "four-states")));
+        Assert.Equal("inForce", Half(await RedirectsAsync(admin), "signIn").State);
+        Assert.Equal("inForce", Half(await RedirectsAsync(admin), "register").State);
+
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            $"/api/v1/identity/providers/{id}", Provider("four-states", enabled: false)));
+        Assert.Equal("disabled", Half(await RedirectsAsync(admin), "signIn").State);
+
+        // Removed entirely, which leaves the column naming nobody — the state
+        // pre-configuration ships in.
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await admin.DeleteAsync($"/api/v1/identity/providers/{id}")).StatusCode);
+
+        var gone = Half(await RedirectsAsync(admin), "signIn");
+        Assert.Equal("unregistered", gone.State);
+        Assert.Equal("four-states", gone.Slug);
+        Assert.Null(gone.Name);
+
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            "/api/v1/instance", SettingsRedirecting("", "")));
+        Assert.Equal("none", Half(await RedirectsAsync(admin), "signIn").State);
+        Assert.Equal("none", Half(await RedirectsAsync(admin), "register").State);
+    }
+
+    /// <summary>Only the permission that writes these columns may read them.</summary>
+    [Fact]
+    public async Task Only_instance_update_reads_the_redirects()
+    {
+        var nobody = await Sign.NewAccountAsync(server, "redirect-outsider");
+        var anonymous = server.CreateClient();
+
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await anonymous.GetAsync("/api/v1/instance/redirects")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await nobody.GetAsync("/api/v1/instance/redirects")).StatusCode);
+    }
+
+    /// <summary>
+    /// **A save that says nothing about a redirect leaves it alone**, and that is
+    /// the contract the panel depends on to stop destroying one.
+    /// <para>
+    /// The panel seeds its form from the filtered public answer, so while a
+    /// provider is switched off it cannot see the slug it holds. It therefore
+    /// omits the field rather than sending what it can see — and absent has to go
+    /// on meaning *leave it alone* for that to be safe, including on a request
+    /// that changes something else entirely.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task A_save_that_omits_the_redirect_keeps_it_while_the_provider_is_off()
+    {
+        var admin = await Sign.InAsync(server, Seeder.DevAdminLogin, Seeder.DevAdminPassword);
+        var anonymous = server.CreateClient();
+
+        var created = await admin.PostAsJsonAsync("/api/v1/identity/providers",
+            Registration("omitted-survives"));
+        await Sign.Succeeded(created);
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString();
+
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            "/api/v1/instance", SettingsRedirecting("omitted-survives", "omitted-survives")));
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            $"/api/v1/identity/providers/{id}", Provider("omitted-survives", enabled: false)));
+
+        // Somebody saves the tab for an unrelated reason. The body states no
+        // redirect at all, exactly as the panel now does.
+        await Sign.Succeeded(await admin.PutAsJsonAsync("/api/v1/instance", LegacySettings()));
+
+        var after = await RedirectsAsync(admin);
+        Assert.Equal(("disabled", "omitted-survives"),
+            (Half(after, "signIn").State, Half(after, "signIn").Slug));
+        Assert.Equal(("disabled", "omitted-survives"),
+            (Half(after, "register").State, Half(after, "register").Slug));
+
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            $"/api/v1/identity/providers/{id}", Provider("omitted-survives", enabled: true)));
+        Assert.Equal("omitted-survives",
+            RedirectOn(await anonymous.GetFromJsonAsync<JsonElement>("/api/v1/instance")));
+
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            "/api/v1/instance", SettingsRedirecting("", "")));
+    }
+
+    /// <summary>
+    /// **Blank still clears, whatever state the redirect is in.** Absent meaning
+    /// *leave alone* must not turn into "a redirect whose provider is off cannot
+    /// be removed": the operator chose the empty option and that is a decision.
+    /// </summary>
+    [Fact]
+    public async Task A_redirect_whose_provider_is_off_can_still_be_cleared()
+    {
+        var admin = await Sign.InAsync(server, Seeder.DevAdminLogin, Seeder.DevAdminPassword);
+
+        var created = await admin.PostAsJsonAsync("/api/v1/identity/providers",
+            Registration("cleared-while-off"));
+        await Sign.Succeeded(created);
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString();
+
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            "/api/v1/instance", SettingsRedirecting("cleared-while-off")));
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            $"/api/v1/identity/providers/{id}", Provider("cleared-while-off", enabled: false)));
+
+        await Sign.Succeeded(await admin.PutAsJsonAsync(
+            "/api/v1/instance", SettingsRedirecting("")));
+
+        Assert.Equal("none", Half(await RedirectsAsync(admin), "signIn").State);
     }
 
     private static async Task<string> Read(HttpResponseMessage response) =>

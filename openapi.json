@@ -4606,6 +4606,35 @@
         }
       }
     },
+    "/instance/redirects": {
+      "get": {
+        "tags": [
+          "InstanceAdmin"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRedirectsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRedirectsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRedirectsDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/instance/external-content": {
       "get": {
         "tags": [
@@ -13422,6 +13451,43 @@
           "language": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "InstanceRedirectDto": {
+        "required": [
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "InstanceRedirectsDto": {
+        "required": [
+          "register",
+          "signIn"
+        ],
+        "type": "object",
+        "properties": {
+          "signIn": {
+            "$ref": "#/components/schemas/InstanceRedirectDto"
+          },
+          "register": {
+            "$ref": "#/components/schemas/InstanceRedirectDto"
           }
         },
         "additionalProperties": false
