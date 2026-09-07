@@ -298,12 +298,41 @@ the released chain plus the squashed one.
       whether to take them is the owner's call, and neither is a reason to hold
       a release.
 
-      **The images the suite and the development stack start move too**, and
-      they are pinned in two places each. Both were raised on 2026-09-07:
-      `rustfs` `1.0.0-rc.4` → `rc.5` (the full suite is identical on either) and
-      `chrislusf/seaweedfs` `4.43` → `4.45`. The Seaweed pin had stood two
-      versions back on a comparison that turned out to be confounded by a test
-      of ours; see `CLAUDE.md`.
+- [ ] **Every image this repository pins has been looked at**, and what is
+      behind is behind for a reason somebody wrote down. There are five, in
+      three files, and **two of them are pinned twice** — a bump that changes
+      one copy and not the other is the failure this list exists to catch.
+      `README.md`'s version table states four of the five in prose as well, and
+      it went stale exactly that way on 2026-09-07.
+
+      | | |
+      |---|---|
+      | `mcr.microsoft.com/dotnet/aspnet:10.0` | `AlgoJudge.Server/Dockerfile` |
+      | `mcr.microsoft.com/dotnet/sdk:10.0` | `AlgoJudge.Server/Dockerfile` |
+      | `postgres:18` | `example-server-development-docker-compose.yaml` |
+      | `rustfs/rustfs:1.0.0-rc.5` | that file **and** `S3BlobStoreTests.cs` |
+      | `chrislusf/seaweedfs:4.45` | `S3BlobStoreTests.cs` |
+
+      ```sh
+      grep -rn 'image:' example-server-development-docker-compose.yaml
+      grep -n '^FROM' AlgoJudge.Server/Dockerfile
+      grep -n 'ContainerBuilder(' AlgoJudge.Server.Tests/S3BlobStoreTests.cs
+      ```
+
+      **A store this suite starts is not a store an installation runs**, so a
+      newer one is taken when the suite agrees on it and left alone otherwise.
+      `postgres:18` is different: the major is pinned deliberately, and 18 moved
+      the data directory, so raising it is a migration question rather than a
+      version bump. The two .NET images follow the target framework and move
+      with it, not on their own.
+
+      2026-09-07: `rustfs` `1.0.0-rc.4` → `rc.5`, the full suite identical on
+      either, and `chrislusf/seaweedfs` `4.43` → `4.45`. The Seaweed pin had
+      stood two versions back on a comparison confounded by a test of ours; see
+      `CLAUDE.md`. The other three were checked and left.
+
+      The actions the workflows use are pinned by major — `actions/checkout@v7`,
+      `actions/setup-dotnet@v6` — and are worth the same glance.
 - [ ] **The .NET version is the one this targets.** `net10.0` in both projects,
       `aspnet:10.0` and `sdk:10.0` in the Dockerfile, `10.0.x` on CI, and
       `10.0.400` locally on 2026-09-07. .NET 10 is the LTS; .NET 8 leaves

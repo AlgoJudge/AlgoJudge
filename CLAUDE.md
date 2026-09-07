@@ -531,8 +531,8 @@ dotnet ef migrations add <Name> --project AlgoJudge.Server --context Application
     class in the collection made a request first. `ServerFixture` now migrates
     once during `InitializeAsync`, which removed the ordering assumption from
     every suite and let two duplicated warm-up helpers be deleted.
-  - **`chrislusf/seaweedfs` stays at 4.43, and two separate things were behind
-    that — one fixed, one not.**
+  - **`chrislusf/seaweedfs` stayed at 4.43, and two separate things were behind
+    that.** Both are settled now, and the pin moved on 2026-09-07.
     - **Fixed: a readiness race that was ours.** "An internal error" from 4.44
       was never a broken image; the two versions log **identically** at startup
       and a warmed 4.44 serves every contract test. They differ only in how long
