@@ -79,9 +79,11 @@ jobs:
       - name: Compose up
         run: docker compose -f example-server-development-docker-compose.yaml up -d --wait
 
-      # `--wait` only waits for a healthcheck, and the application service has
-      # none, so the container counts as up while the .NET host is still
-      # starting. Poll instead of assuming.
+      # The image carries a `HEALTHCHECK` (`AlgoJudge.Server/Dockerfile`), so
+      # `--wait` above does wait for the application rather than for the
+      # container. This asks the same question from outside — through the
+      # published port, from the host — which is how everything after it
+      # reaches the Server.
       - name: The API answers
         run: |
           for i in $(seq 1 30); do
