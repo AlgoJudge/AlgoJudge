@@ -302,6 +302,8 @@ the released chain plus the squashed one.
       behind is behind for a reason somebody wrote down. There are five, in
       three files, and **two of them are pinned twice** — a bump that changes
       one copy and not the other is the failure this list exists to catch.
+      `README.md`'s version table states four of the five in prose as well, and
+      it went stale exactly that way on 2026-09-07.
 
       | | |
       |---|---|
