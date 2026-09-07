@@ -541,17 +541,33 @@ dotnet ef migrations add <Name> --project AlgoJudge.Server --context Application
       left two failures and a log marker three, because 403 comes from the auth
       layer before the filer behind it can serve. `ServingAsync` retries the
       store's own health check instead, and the health failures are gone.
-    - **Not fixed: `Bytes_nobody_encrypted_are_findable_in_the_data_directory`
-      is intermittent, on both versions.** It read as a version difference —
-      4.44 failing three of three where 4.43 passed — until 4.43 failed three of
-      three and then passed. **Too few runs of a flaky test look exactly like a
-      version difference**, and that is how the first conclusion was reached.
-      Retrying the grep narrows the window without closing it, so the bytes
-      sometimes never reach `/data` greppably rather than reaching it late.
-    - So the pin stands on a **confounded comparison**, said so in place. Taking
-      4.44 wants the flake understood first. **None of it shows up by default**:
-      the suite skips unless `ALGOJUDGE_S3=seaweedfs` is set, in CI included.
-  - `rustfs` went `1.0.0-rc.1` → `rc.4`; there is still **no stable 1.0.0**.
+    - **Was "not fixed", and is now understood: the test was the fault.**
+      `Bytes_nobody_encrypted_are_findable_in_the_data_directory` was
+      intermittent on every version, which read as a difference between images
+      until the same version both failed and passed. **Measured 2026-09-07**:
+      the object's bytes are on disk, complete and contiguous — `od` shows all
+      forty-eight characters of the needle — while at that same moment `grep`
+      finds a forty-four character prefix of it in that very file and not the
+      whole string. The bytes reach `/data`; `grep` does not see them. Ten runs,
+      one failure in five on 4.43 and three in five on 4.45, that test and
+      nothing else, p = 0.52.
+    - **So the disk check is gone and the pin moved to 4.45** (2026-09-07). A
+      method that answers "absent" about bytes that are present cannot decide
+      encryption at rest, and it fails in the dangerous direction: `false` is
+      what the assertion read as "encrypted", so a store that encrypted nothing
+      would have passed. What replaces it asserts what the S3 contract can
+      state — the store takes the configuration and reports `AES256` for the
+      object — and **runs on the default endpoint**, where the old pair only
+      ever skipped.
+    - **SeaweedFS agrees to encrypt and then stops working.** Measured the same
+      day, identically on 4.43 and 4.45: `PutBucketEncryption` is accepted,
+      `GetBucketEncryption` returns the rule, and every write to that bucket
+      afterwards fails with an internal error, though a write before the call
+      succeeds. The note that it "answers `PutBucketEncryption` with an internal
+      error" described the wrong call. `EncryptionCapableFactAttribute` skips
+      there and says so.
+  - `rustfs` went `1.0.0-rc.1` → `rc.4`, and `rc.5` on 2026-09-07; there is
+    still **no stable 1.0.0**.
     `postgres:18` is unchanged: there is no 19, and the major pin is deliberate.
   - **Warnings 15 → 14.** The nine the bump introduced were fixed because the
     bump introduced them; the fourteen that predate it are still measured and
