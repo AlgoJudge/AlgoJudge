@@ -72,15 +72,16 @@ context gets the first.
 | `ApplicationDbContext` | `AlgoJudge.Server/Database/Migrations` | `ApplicationDbContextModelSnapshot.cs` | `__EFMigrationsHistory` |
 | `LtiDbContext` | `AlgoJudge.Server/Lti/Migrations` | `LtiDbContextModelSnapshot.cs` | `__EFMigrationsHistory_Lti` |
 
-**Eight and one on 2026-09-07.** Both get a `version_0_1_0`; the two classes sit
-in different namespaces, so the name does not collide. The LTI one is a rename
-of a single migration rather than a merge of several, and is done the same way.
+**One and one since 2026-09-07**, both named `version_0_1_0` — the two classes
+sit in different namespaces, so the name does not collide. Eight went into the
+first and one into the second, which made the LTI half a rename rather than a
+merge; it is done the same way either way.
 
 ### What a regeneration silently drops
 
 Three things, all of them measured on 2026-09-07 rather than remembered.
 
-1. **The `FileContents` block**, at the end of `InitialCreate.Up`, with its
+1. **The `FileContents` block**, at the end of `version_0_1_0.Up`, with its
    `DROP TABLE IF EXISTS` at the start of `Down`. It is not an EF entity — the
    postgres blob store reads and writes those bytes with raw SQL — so
    `dotnet ef migrations add` does not produce it, and neither does the
@@ -99,11 +100,17 @@ Three things, all of them measured on 2026-09-07 rather than remembered.
    property whose value equals the CLR default. They are the **expected**
    difference in the schema comparison below.
 
-3. **The comments.** The XML summary on `InitialCreate`, and the note above
-   `ShowHero`'s `defaultValue: true` recording that the generator wrote `false`
-   and that it was corrected by hand. That correction has no successor after the
-   squash and needs none: on a database built from one migration the column
-   arrives with the row.
+3. **The comments.** The summary on the migration class, which is written again
+   rather than recovered, and the note above `ShowHero`'s `defaultValue: true`
+   recording that the generator wrote `false` and that it was corrected by hand.
+   That correction has no successor after a squash and needs none: on a database
+   built from one migration the column arrives with the row.
+
+   **A hand-written fragment is not automatically one to keep.** The question is
+   whether it describes something outside the model — carry it — or only the way
+   across from the previous version, which a fresh `CREATE TABLE` does not
+   travel. `FileContents` is the first; the `ShowHero` correction is the
+   second.
 
 **Nothing else in either chain is hand-written.** Every check constraint, every
 filtered index and `RunnerTags`' `defaultValueSql` is declared in the model —
@@ -191,6 +198,11 @@ allowed to differ, and nothing else:
   one is in the model;
 - `FileContents` still there, still `SET STORAGE EXTERNAL`.
 
+On 2026-09-07 that came to fifty-two lines of `diff` output and nothing else:
+`pg_dump`'s own session token, reordered columns in `EvaluationJobs` and
+`Instance`, and those three `DEFAULT`s. Both dumps were 2610 lines, with 53
+tables, 102 indexes, 4 check constraints and 61 foreign keys on each side.
+
 **7. One history row per context.**
 
 ```sh
@@ -202,7 +214,42 @@ $compose exec -T postgres psql -U algojudge -d algojudge \
 Eight rows and one before, on 2026-09-07; one and one after.
 
 **8.** `$compose down -v`, and regenerate `openapi.json` from a stack that is up
-if anything about the API moved. The squash alone does not move it.
+if anything about the API moved. The squash alone does not move it — checked on
+2026-09-07, and the served document was identical to the committed one.
+
+### From 0.1.1 on it is a delta, and the steps above are not enough
+
+**0.1.0 is the easy case, and the only one that looks like this.** Nothing had
+been released, so every migration was unreleased and the squash collapsed into a
+single `CREATE TABLE` per context. Once a release exists, `version_0_1_1` has to
+carry a database **standing at 0.1.0** to the current model. That is a delta of
+`ALTER`s, and three things change.
+
+**Do not delete the released migrations.** Delete only the ones added since the
+last release, and **roll the snapshot back to the state that release left**:
+
+```sh
+git checkout v0.1.0 --     AlgoJudge.Server/Database/Migrations/ApplicationDbContextModelSnapshot.cs     AlgoJudge.Server/Lti/Migrations/LtiDbContextModelSnapshot.cs
+```
+
+The snapshot is the differ's *before*. Left at the current model it produces an
+empty migration; rolled back, it produces exactly the delta.
+
+**Every backfill decision in the squashed range has to be made again.** The
+tables now hold rows, so `AddColumn` needs a value for them and the generator
+writes the CLR default — which is how `ShowHero` got `false` from the generator
+and `true` from a person. Read the migrations being deleted before deleting
+them, and carry each such choice across deliberately.
+
+**The schema comparison stops being the whole proof.** `pg_dump --schema-only`
+says nothing about a migration that rewrites rows. There were none at 0.1.0 —
+the only two `migrationBuilder.Sql` calls in this repository are the
+`FileContents` DDL — but the first one that appears needs a check of its own:
+apply the old chain to a database with rows in it, apply the squashed one to
+another, and compare the data the step was supposed to produce. Step 6 also has
+to start from the released schema rather than an empty database — one database
+migrated with the released chain plus the unreleased migrations, another with
+the released chain plus the squashed one.
 
 ## Before the tag
 
@@ -210,8 +257,11 @@ if anything about the API moved. The squash alone does not move it.
       on 2026-09-07.**
 - [ ] `README.md` names that version where it shows a `docker pull` — line 245,
       `ghcr.io/algojudge/algojudge-server:0.1.0` on 2026-09-07.
-- [ ] **The migrations are squashed into `version_0_1_0`**, both contexts, by
-      the section above.
+- [ ] **The migrations are squashed into one per context**, named for the
+      release, by the section above. **Done for 0.1.0 on 2026-09-07**: one
+      history row per context, and the schema comparison differed only in
+      `pg_dump`'s session token, column order, and the three defaults it is
+      meant to drop.
 - [ ] **The commit is on `main`**, and **its** CI run is green — not a later
       one. `release/0.1.0` is not `main`, and the workflow refuses a tag that is
       not an ancestor of it: on 2026-09-07 this branch was one commit ahead of
@@ -222,7 +272,8 @@ if anything about the API moved. The squash alone does not move it.
       release build treats **every warning as an error**; the count to aim at is
       zero, and it was zero on 2026-09-07 as it has been since 2026-08-29.
 - [ ] `dotnet test AlgoJudge.sln -c Release --no-build`. Docker has to be
-      running — the suite starts a real PostgreSQL 18 per run.
+      running — the suite starts a real PostgreSQL 18 per run. 823 passed and
+      2 skipped on 2026-09-07, in 2 m 49 s.
 - [ ] The development stack comes up and answers: the `compose` job in
       `.github/workflows/ci.yml` is the list, and the one to run by hand if
       anything about configuration changed.
@@ -278,15 +329,13 @@ if anything about the API moved. The squash alone does not move it.
       workflows. `preconfig.example/pages/*.md` are an installation's own
       content, not documentation.
 
-      On 2026-09-07 all of those held except two, neither of them this file's to
-      fix:
-      - `CLAUDE.md:407` — "**The schema is one migration per context**" was true
-        on 2026-08-28 and is not now; seven followed. The squash above makes it
-        true again, and the sentence should be re-read rather than assumed.
-      - `.github/workflows/ci.yml:82` — "`--wait` only waits for a healthcheck,
-        and the application service has none". It has had one since 2026-08-08
-        (`fb6f122`); that comment is from 2026-08-03 (`e1b0700`). The polling
-        under it is still right; its stated reason is not.
+      Two were wrong on 2026-09-07 and both were corrected with the squash.
+      `CLAUDE.md` said the schema was one migration per context when seven had
+      followed the 2026-08-28 squash. `ci.yml` said the application service had
+      no healthcheck: the image has carried one since 2026-08-09 (`d05babc`),
+      and `docker compose up --wait` reports the service `Healthy`. The polling
+      under that comment stays — it asks from the host, through the published
+      port.
 
 ## After the tag
 
