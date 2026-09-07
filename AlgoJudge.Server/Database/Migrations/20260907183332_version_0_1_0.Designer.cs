@@ -14,8 +14,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AlgoJudge.Server.Database.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260904050336_JobReleases")]
-    partial class JobReleases
+    [Migration("20260907183332_version_0_1_0")]
+    partial class version_0_1_0
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -310,6 +310,9 @@ namespace AlgoJudge.Server.Database.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("AcknowledgedAt")
+                        .HasColumnType("timestamptz");
+
                     b.Property<int>("Attempt")
                         .HasColumnType("integer");
 
@@ -339,6 +342,9 @@ namespace AlgoJudge.Server.Database.Migrations
 
                     b.Property<Guid>("ProblemVersionId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("Refunds")
+                        .HasColumnType("integer");
 
                     b.Property<int>("Releases")
                         .HasColumnType("integer");
@@ -370,7 +376,11 @@ namespace AlgoJudge.Server.Database.Migrations
 
                     b.HasIndex("RunnerId");
 
-                    b.HasIndex("State", "CreatedAt");
+                    b.HasIndex("SubmissionId")
+                        .HasFilter("\"State\" = 1");
+
+                    b.HasIndex("State", "CreatedAt")
+                        .HasFilter("\"State\" < 2");
 
                     b.HasIndex("SubmissionId", "Attempt")
                         .IsUnique();
@@ -460,6 +470,9 @@ namespace AlgoJudge.Server.Database.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<Guid?>("UploadedByRunnerId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("UploadedByUserId")
                         .HasColumnType("text");
 
@@ -474,6 +487,8 @@ namespace AlgoJudge.Server.Database.Migrations
                     b.HasIndex("Sha256");
 
                     b.HasIndex("StorageId");
+
+                    b.HasIndex("UploadedByRunnerId");
 
                     b.HasIndex("UploadedByUserId");
 
@@ -752,6 +767,10 @@ namespace AlgoJudge.Server.Database.Migrations
                     b.Property<string>("Name")
                         .HasColumnType("text");
 
+                    b.Property<string>("RegisterRedirectProvider")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<bool>("RequireConfirmedEmail")
                         .HasColumnType("boolean");
 
@@ -767,11 +786,18 @@ namespace AlgoJudge.Server.Database.Migrations
                     b.Property<bool>("SeriesRestrictionsEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("ShowHero")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("ShowLocalSignIn")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("ShowLogo")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("SignInRedirectProvider")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.HasKey("Id");
 
@@ -1922,12 +1948,19 @@ namespace AlgoJudge.Server.Database.Migrations
 
             modelBuilder.Entity("AlgoJudge.Server.Database.Models.File", b =>
                 {
+                    b.HasOne("AlgoJudge.Server.Database.Models.Runner", "UploadedByRunner")
+                        .WithMany()
+                        .HasForeignKey("UploadedByRunnerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("AlgoJudge.Server.Database.Models.User", "UploadedBy")
                         .WithMany()
                         .HasForeignKey("UploadedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("UploadedBy");
+
+                    b.Navigation("UploadedByRunner");
                 });
 
             modelBuilder.Entity("AlgoJudge.Server.Database.Models.FileReference", b =>

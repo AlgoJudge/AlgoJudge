@@ -9,13 +9,21 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AlgoJudge.Server.Database.Migrations
 {
     /// <summary>
-    /// The whole schema, in one migration.
+    /// The whole schema, in one migration, named for the release that creates it.
     /// <para>
-    /// <b>Squashed on 2026-08-28</b>, before 0.1.0 and therefore before any
-    /// installation had a database to carry forward: thirty-one migrations for
-    /// this context and seven for the LTI one became one each. What the old
-    /// chain carried and this does not is its backfills — every one of them
-    /// rewrote rows an empty database does not have.
+    /// <b>Squashed on 2026-09-07</b>, for 0.1.0 and therefore before any
+    /// installation had a database to carry forward: eight migrations for this
+    /// context and one for the LTI one became one each. Only unreleased
+    /// migrations are ever squashed, so no released history row is removed and
+    /// no released database is stranded.
+    /// </para>
+    /// <para>
+    /// What the old chain carried and this does not is three column defaults —
+    /// <c>EvaluationJobs.Releases</c>, <c>EvaluationJobs.Refunds</c> and
+    /// <c>Instance.ShowHero</c>. Each came from an <c>AddColumn</c> whose job
+    /// was to backfill a table that already held rows, and a table created in
+    /// one statement has none. Each is matched by a CLR initializer, and the
+    /// model declares no default for any of them.
     /// </para>
     /// <para>
     /// <b>One thing here is not generated from the model</b>, at the end of
@@ -23,7 +31,7 @@ namespace AlgoJudge.Server.Database.Migrations
     /// mechanical act; that block is not, and would be lost by one.
     /// </para>
     /// </summary>
-    public partial class InitialCreate : Migration
+    public partial class version_0_1_0 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -177,6 +185,9 @@ namespace AlgoJudge.Server.Database.Migrations
                     ExternalFetchHosts = table.Column<List<string>>(type: "text[]", nullable: false),
                     SeriesRestrictionsEnabled = table.Column<bool>(type: "boolean", nullable: false),
                     ShowLocalSignIn = table.Column<bool>(type: "boolean", nullable: false),
+                    ShowHero = table.Column<bool>(type: "boolean", nullable: false),
+                    SignInRedirectProvider = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: true),
+                    RegisterRedirectProvider = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: true),
                     AccountDeletionEnabled = table.Column<bool>(type: "boolean", nullable: false),
                     xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false)
                 },
@@ -488,32 +499,6 @@ namespace AlgoJudge.Server.Database.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Files",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
-                    MimeType = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    SizeBytes = table.Column<long>(type: "bigint", nullable: false),
-                    StorageId = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    PreviousStorageId = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: true),
-                    PreviousCopyDeleteAfter = table.Column<DateTime>(type: "timestamptz", nullable: true),
-                    Sha256 = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamptz", nullable: false),
-                    UploadedByUserId = table.Column<string>(type: "text", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Files", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Files_AspNetUsers_UploadedByUserId",
-                        column: x => x.UploadedByUserId,
-                        principalTable: "AspNetUsers",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Problems",
                 columns: table => new
                 {
@@ -671,6 +656,39 @@ namespace AlgoJudge.Server.Database.Migrations
                         principalTable: "IdentityProviders",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Files",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    MimeType = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    SizeBytes = table.Column<long>(type: "bigint", nullable: false),
+                    StorageId = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    PreviousStorageId = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: true),
+                    PreviousCopyDeleteAfter = table.Column<DateTime>(type: "timestamptz", nullable: true),
+                    Sha256 = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamptz", nullable: false),
+                    UploadedByUserId = table.Column<string>(type: "text", nullable: true),
+                    UploadedByRunnerId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Files", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Files_AspNetUsers_UploadedByUserId",
+                        column: x => x.UploadedByUserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_Files_Runners_UploadedByRunnerId",
+                        column: x => x.UploadedByRunnerId,
+                        principalTable: "Runners",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -1004,6 +1022,9 @@ namespace AlgoJudge.Server.Database.Migrations
                     State = table.Column<int>(type: "integer", nullable: false),
                     LeaseToken = table.Column<Guid>(type: "uuid", nullable: true),
                     Deliveries = table.Column<int>(type: "integer", nullable: false),
+                    Releases = table.Column<int>(type: "integer", nullable: false),
+                    AcknowledgedAt = table.Column<DateTime>(type: "timestamptz", nullable: true),
+                    Refunds = table.Column<int>(type: "integer", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamptz", nullable: false),
                     ClaimedAt = table.Column<DateTime>(type: "timestamptz", nullable: true),
                     LeaseExpiresAt = table.Column<DateTime>(type: "timestamptz", nullable: true),
@@ -1058,7 +1079,7 @@ namespace AlgoJudge.Server.Database.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_FileReferences", x => x.Id);
-                    table.CheckConstraint("CK_FileReferences_OwnerKindMatches", "(\"OwnerKind\" = 0 AND \"ProblemVersionId\" IS NOT NULL) OR (\"OwnerKind\" = 1 AND \"ActivityId\" IS NOT NULL) OR (\"OwnerKind\" = 2 AND \"InstanceId\" IS NOT NULL) OR (\"OwnerKind\" = 3 AND \"InstanceId\" IS NOT NULL) OR (\"OwnerKind\" = 4 AND \"RunnerId\" IS NOT NULL) OR (\"OwnerKind\" = 5 AND \"SubmissionId\" IS NOT NULL) OR (\"OwnerKind\" = 6 AND \"EvaluationJobId\" IS NOT NULL)");
+                    table.CheckConstraint("CK_FileReferences_OwnerKindMatches", "(\"OwnerKind\" = 0 AND \"ProblemVersionId\" IS NOT NULL) OR (\"OwnerKind\" = 1 AND \"ActivityId\" IS NOT NULL) OR (\"OwnerKind\" = 2 AND \"InstanceId\" IS NOT NULL) OR (\"OwnerKind\" = 3 AND \"InstanceId\" IS NOT NULL) OR (\"OwnerKind\" = 4 AND \"RunnerId\" IS NOT NULL) OR (\"OwnerKind\" = 5 AND \"SubmissionId\" IS NOT NULL) OR (\"OwnerKind\" = 6 AND \"EvaluationJobId\" IS NOT NULL) OR (\"OwnerKind\" = 7 AND \"InstanceId\" IS NOT NULL) OR (\"OwnerKind\" = 8 AND \"InstanceId\" IS NOT NULL)");
                     table.CheckConstraint("CK_FileReferences_SingleOwner", "num_nonnulls(\"ProblemVersionId\", \"ActivityId\", \"SubmissionId\", \"EvaluationJobId\", \"RunnerId\", \"InstanceId\") = 1");
                     table.ForeignKey(
                         name: "FK_FileReferences_Activities_ActivityId",
@@ -1241,7 +1262,14 @@ namespace AlgoJudge.Server.Database.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_EvaluationJobs_State_CreatedAt",
                 table: "EvaluationJobs",
-                columns: new[] { "State", "CreatedAt" });
+                columns: new[] { "State", "CreatedAt" },
+                filter: "\"State\" < 2");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_EvaluationJobs_SubmissionId",
+                table: "EvaluationJobs",
+                column: "SubmissionId",
+                filter: "\"State\" = 1");
 
             migrationBuilder.CreateIndex(
                 name: "IX_EvaluationJobs_SubmissionId_Attempt",
@@ -1319,6 +1347,11 @@ namespace AlgoJudge.Server.Database.Migrations
                 name: "IX_Files_StorageId",
                 table: "Files",
                 column: "StorageId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Files_UploadedByRunnerId",
+                table: "Files",
+                column: "UploadedByRunnerId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Files_UploadedByUserId",
