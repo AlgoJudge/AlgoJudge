@@ -297,6 +297,13 @@ the released chain plus the squashed one.
       `Testcontainers.PostgreSql` 4.14.0 → 4.15.0. Neither was taken here;
       whether to take them is the owner's call, and neither is a reason to hold
       a release.
+
+      **The images the suite and the development stack start move too**, and
+      they are pinned in two places each. Both were raised on 2026-09-07:
+      `rustfs` `1.0.0-rc.4` → `rc.5` (the full suite is identical on either) and
+      `chrislusf/seaweedfs` `4.43` → `4.45`. The Seaweed pin had stood two
+      versions back on a comparison that turned out to be confounded by a test
+      of ours; see `CLAUDE.md`.
 - [ ] **The .NET version is the one this targets.** `net10.0` in both projects,
       `aspnet:10.0` and `sdk:10.0` in the Dockerfile, `10.0.x` on CI, and
       `10.0.400` locally on 2026-09-07. .NET 10 is the LTS; .NET 8 leaves
