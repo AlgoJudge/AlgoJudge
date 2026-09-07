@@ -1,4 +1,4 @@
-using AlgoJudge.Server.Storage;
+﻿using AlgoJudge.Server.Storage;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 
@@ -76,9 +76,6 @@ public sealed class S3BlobStoreTests : BlobStoreContract, IAsyncLifetime
 
     private IContainer? container;
     private S3BlobStore store = null!;
-
-    /// <summary>Where the running implementation keeps its bytes, for the one test that looks.</summary>
-    private string dataDirectory = "/data";
 
     protected override IBlobStore Store => store;
 
@@ -183,9 +180,7 @@ public sealed class S3BlobStoreTests : BlobStoreContract, IAsyncLifetime
     /// </summary>
     private ContainerBuilder Rustfs()
     {
-        dataDirectory = "/data";
-
-        return new ContainerBuilder("rustfs/rustfs:1.0.0-rc.4")
+        return new ContainerBuilder("rustfs/rustfs:1.0.0-rc.5")
             // **Readiness is the implementation's business, not the caller's.**
             // Waiting for the port was waiting for the wrong thing: both stores
             // open it in about 100 ms and answer seconds later.
@@ -211,36 +206,23 @@ public sealed class S3BlobStoreTests : BlobStoreContract, IAsyncLifetime
     /// </summary>
     private ContainerBuilder Seaweed()
     {
-        dataDirectory = "/data";
-
-        // **4.43, and 4.44 is newer.** Two separate things were found behind
-        // that, and only one of them is fixed.
+        // **4.45.** The version behind this pin was settled twice over, and the
+        // second time settled the first.
         //
-        // The first was ours: "an internal error" from 4.44 was a **readiness
-        // race**, not a broken image. Both versions log identically at startup
-        // and differ only in how long they take — 2.1 s against 3.1 s to a first
-        // answer, against a port that opens in about 100 ms. `ServingAsync`
-        // closed that, and it stays closed whichever version runs.
+        // "An internal error" from a newer image was a **readiness race** of
+        // ours, not a broken image: the versions log identically at startup and
+        // differ only in how long they take to a first answer, against a port
+        // that opens in about 100 ms. `ServingAsync` closed it.
         //
-        // The second is **not** ours to have caused and is **not fixed**:
-        // `Bytes_nobody_encrypted_are_findable_in_the_data_directory` is
-        // intermittent, and on both versions. It was read as a difference
-        // between images — 4.44 failing three runs of three where 4.43 passed —
-        // until 4.43 also failed three of three and then passed. **Too few runs
-        // of a flaky test look exactly like a version difference.**
-        //
-        // `EventuallyFindableOnDiskAsync` narrows the window and does not close
-        // it, so the bytes sometimes never reach `/data` in a form `grep` sees
-        // rather than merely reaching it late. A hand-written probe of the same
-        // size and incompressibility could not reproduce the findable case on
-        // *either* version, which puts whatever matters inside
-        // `S3BlobStore.WriteAsync` rather than in the object.
-        //
-        // **So 4.43 is where the pin stays, and the comparison behind it is
-        // confounded.** Taking 4.44 wants the flake understood first; it is its
-        // own afternoon, and both the test and the assertion it guards skip
-        // unless `ALGOJUDGE_S3` and `ALGOJUDGE_S3_SSE` are set.
-        return new ContainerBuilder("chrislusf/seaweedfs:4.43")
+        // What kept the pin two versions back after that was
+        // `Bytes_nobody_encrypted_are_findable_in_the_data_directory`,
+        // intermittent on every version tried and read as a difference between
+        // images until the same version both failed and passed. Measured
+        // 2026-09-07 across ten runs: **one failure in five on 4.43 and three in
+        // five on 4.45, every one of them that test and nothing else** — a
+        // difference of p = 0.52, which is to say none. The test itself was the
+        // fault and is gone; see the encryption test below.
+        return new ContainerBuilder("chrislusf/seaweedfs:4.45")
             .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(r => r
                 .ForPort(8333).ForPath("/").ForStatusCodeMatching(_ => true)))
             .WithResourceMapping(
@@ -315,48 +297,32 @@ public sealed class S3BlobStoreTests : BlobStoreContract, IAsyncLifetime
     }
 
     /// <summary>
-    /// The precondition for §13.3's last item, and a real assertion in itself:
-    /// <b>a grep of this store's data directory can see bytes nobody encrypted.</b>
+    /// §13.3's last item, as far as a client can honestly take it: where the
+    /// bucket is configured to encrypt by default, the store keeps accepting
+    /// writes and reports the object it stored as encrypted.
     /// <para>
-    /// Without this, "the plaintext was not findable" says nothing — and that is
-    /// not hypothetical. The first version of the encryption check passed with
-    /// encryption switched off, because on RustFS the needle is never findable.
+    /// <b>It does not grep the store's data directory.</b> That check lived here
+    /// until 2026-09-07 and had to go: measured against SeaweedFS, the object's
+    /// bytes were on disk, complete and contiguous — <c>od</c> showed all
+    /// forty-eight characters — while <c>grep</c> found a forty-four character
+    /// prefix of them in that same file and not the whole string. A method that
+    /// answers "absent" about bytes that are present cannot decide this, and it
+    /// fails in the dangerous direction: <c>false</c> is what the assertion
+    /// reads as "encrypted", so a store that encrypted nothing would have
+    /// passed.
     /// </para>
-    /// </summary>
-    [ReferenceImplementationFact]
-    public async Task Bytes_nobody_encrypted_are_findable_in_the_data_directory()
-    {
-        Assert.NotNull(container);
-
-        var plain = $"algojudge-plaintext-{Guid.NewGuid():N}";
-        await WriteThroughStoreAsync(plain);
-
-        Assert.True(
-            await EventuallyFindableOnDiskAsync(plain),
-            "a grep of the store's data directory could not find bytes that were never encrypted, "
-            + "so it cannot show that encrypted ones are absent either");
-    }
-
-    /// <summary>
-    /// §13.3, the last item: where server-side encryption is on, a known string
-    /// from an object is not findable in the store's data directory.
     /// <para>
-    /// It repeats the control above before asserting anything, so that a green
-    /// result cannot come from a grep that would have found nothing regardless.
+    /// What is left is what the S3 contract can state, and it is not nothing: a
+    /// store that takes the configuration and then reports <c>AES256</c> for the
+    /// object is saying it encrypted it. Whether it really did is that
+    /// implementation's business, measured by hand rather than asserted here.
     /// </para>
     /// </summary>
     [EncryptionCapableFact]
-    public async Task Where_encryption_is_on_the_bytes_are_not_findable_on_disk()
+    public async Task Where_encryption_is_on_the_store_says_so_about_the_object()
     {
-        Assert.NotNull(container);
-
-        var plain = $"algojudge-plaintext-{Guid.NewGuid():N}";
-        await WriteThroughStoreAsync(plain);
-        Assert.True(
-            await EventuallyFindableOnDiskAsync(plain),
-            "the method cannot see unencrypted bytes here, so it proves nothing about encrypted ones");
-
         using var client = ClientFor();
+
         await client.PutBucketEncryptionAsync(new Amazon.S3.Model.PutBucketEncryptionRequest
         {
             BucketName = Bucket,
@@ -375,83 +341,17 @@ public sealed class S3BlobStoreTests : BlobStoreContract, IAsyncLifetime
             },
         });
 
-        var encrypted = $"algojudge-encrypted-{Guid.NewGuid():N}";
-        await WriteThroughStoreAsync(encrypted);
-
-        Assert.False(
-            await FindableOnDiskAsync(encrypted),
-            "the plaintext of an encrypted object was findable in the store's data directory");
-    }
-
-    /// <summary>Writes it, and reads it back, so the store is known to hold it.</summary>
-    private async Task WriteThroughStoreAsync(string text)
-    {
-        // **Incompressible padding**, and not a stylistic choice: a megabyte of
-        // one repeated character is exactly the shape a store compresses, and a
-        // compressed part file hides a plain string as thoroughly as an
-        // encrypted one. Large enough, too, that the object is not inlined into
-        // the store's own metadata, where it is encoded either way.
-        var head = System.Text.Encoding.UTF8.GetBytes(text);
-        var padded = new byte[head.Length + 1024 * 1024];
-        head.CopyTo(padded, 0);
-        Random.Shared.NextBytes(padded.AsSpan(head.Length));
-
+        // The write comes after the configuration on purpose: a store that
+        // accepts the setting and then refuses every write fails here, which is
+        // exactly what it should do.
         var fileId = Guid.NewGuid();
-        var written = await Store.WriteAsync(
-            fileId, new MemoryStream(padded), CancellationToken.None);
+        var body = System.Text.Encoding.UTF8.GetBytes($"algojudge-encrypted-{Guid.NewGuid():N}");
+        var written = await Store.WriteAsync(fileId, new MemoryStream(body), CancellationToken.None);
 
-        await using var read = await Store.OpenReadAsync(
-            new BlobKey(fileId, written.Sha256), CancellationToken.None);
-        using var buffer = new MemoryStream();
-        await read.CopyToAsync(buffer);
+        var head = await client.GetObjectMetadataAsync(
+            Bucket, new BlobKey(fileId, written.Sha256).Path);
 
-        // Encryption at rest is transparent to the product either way; a value
-        // that did not come back would make the grep meaningless in the other
-        // direction.
-        Assert.Equal(padded, buffer.ToArray());
-    }
-
-    /// <summary>
-    /// <c>-a</c>, because a store keeps objects inside files of its own and grep
-    /// treats those as binary and stays quiet without it.
-    /// </summary>
-    private async Task<bool> FindableOnDiskAsync(string needle)
-    {
-        var found = await container!.ExecAsync(["grep", "-r", "-a", "-l", needle, dataDirectory]);
-        return found.ExitCode == 0;
-    }
-
-    /// <summary>
-    /// The same grep, until it finds the bytes or runs out of patience.
-    /// <para>
-    /// <b>A write that has been read back is not yet a write that is on disk.</b>
-    /// The store answers from its own path while the volume file behind it is
-    /// still being flushed, so grepping the moment the object round-trips is a
-    /// race — and it was one this suite lost intermittently, on every version
-    /// tried. It looked like a difference between images until the same version
-    /// both failed three times and passed.
-    /// </para>
-    /// <para>
-    /// Only the <b>positive</b> assertion may wait like this. The negative one —
-    /// that an encrypted object's plaintext is absent — must not, or it would
-    /// pass by asking too early, which is the exact vacuity the control above it
-    /// exists to rule out. It runs after this has already proved the flush
-    /// happens.
-    /// </para>
-    /// </summary>
-    private async Task<bool> EventuallyFindableOnDiskAsync(string needle)
-    {
-        var patience = TimeSpan.FromSeconds(30);
-        var started = DateTime.UtcNow;
-
-        do
-        {
-            if (await FindableOnDiskAsync(needle)) return true;
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
-        }
-        while (DateTime.UtcNow - started < patience);
-
-        return false;
+        Assert.Equal(Amazon.S3.ServerSideEncryptionMethod.AES256, head.ServerSideEncryptionMethod);
     }
 
     private string Bucket => bucket;

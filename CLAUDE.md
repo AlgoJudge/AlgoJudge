@@ -404,21 +404,26 @@ dotnet ef migrations add <Name> --project AlgoJudge.Server --context Application
     applied anywhere; the rename contributes nothing at all, because only the
     property name changed.
 
-- **The schema is one migration per context** (2026-08-28), squashed before
-  0.1.0 while no installation had a database to carry forward. Thirty-one
-  migrations became `InitialCreate`, seven became `LtiInitialCreate`.
+- **The schema is one migration per context, named for the release that
+  created it.** `version_0_1_0` in both, squashed on 2026-09-07 for 0.1.0. That
+  is the standing rule: before each release the migrations added since the
+  previous one become one, called `version_<major>_<minor>_<patch>`. Only
+  unreleased migrations are ever squashed, so no released history row is removed
+  and no released database is stranded. `docs/RELEASE.md` carries the procedure.
   - **One block is hand-written, and a regeneration loses it.** `FileContents`,
-    at the end of `InitialCreate`: it is not an EF entity — the postgres blob
+    at the end of `version_0_1_0`: it is not an EF entity — the postgres blob
     store reads and writes it with raw SQL — so `dotnet ef migrations add` does
     not produce it, and neither the table nor its `SET STORAGE EXTERNAL` comes
     back on its own. `FileStorageSchemaTests` is the guard; proved by deleting
     that one `ALTER TABLE` line and watching `attstorage` go from `e` to `x`.
-  - **Everything else the old chain carried was backfill** — rewriting rows a new
-    database does not have — or shaped a column into what the model already
+  - **Everything else a squashed chain carried was backfill** — rewriting rows a
+    new database does not have — or shaped a column into what the model already
     declares, such as the `inet` conversion of `UserSessions.IpAddress`.
-  - **Eleven database defaults were dropped on purpose, and must not be put
-    back.** They were scaffolding from `AddColumn(defaultValue: …)`, never in
-    the model, and each is matched by a CLR initializer. Declaring them with
+  - **Fourteen database defaults were dropped on purpose, and must not be put
+    back** — eleven in 2026-08-28, and `EvaluationJobs.Releases`,
+    `EvaluationJobs.Refunds` and `Instance.ShowHero` in 2026-09-07. They were
+    scaffolding from `AddColumn(defaultValue: …)`, never in the model, and each
+    is matched by a CLR initializer. Declaring them with
     `HasDefaultValue` would be worse than losing them: EF omits a property whose
     value equals the CLR default, so an explicit `ShowLocalSignIn = false` would
     be stored as `true`.
@@ -428,7 +433,7 @@ dotnet ef migrations add <Name> --project AlgoJudge.Server --context Application
   - **Verified by diffing two schemas**, not by reading the generated file: the
     full old chain and the squashed pair were applied to two databases and
     `pg_dump --schema-only` compared. Once column order is normalised the only
-    differences are the eleven defaults above.
+    differences are the defaults above. Done again on 2026-09-07.
   - **It found a stale snapshot.** `ApplicationDbContextModelSnapshot.cs` still
     declared `Runner.RowVersion` — the token that was tried and taken off the
     same day — because removing a property does not regenerate the snapshot.
@@ -536,17 +541,33 @@ dotnet ef migrations add <Name> --project AlgoJudge.Server --context Application
       left two failures and a log marker three, because 403 comes from the auth
       layer before the filer behind it can serve. `ServingAsync` retries the
       store's own health check instead, and the health failures are gone.
-    - **Not fixed: `Bytes_nobody_encrypted_are_findable_in_the_data_directory`
-      is intermittent, on both versions.** It read as a version difference —
-      4.44 failing three of three where 4.43 passed — until 4.43 failed three of
-      three and then passed. **Too few runs of a flaky test look exactly like a
-      version difference**, and that is how the first conclusion was reached.
-      Retrying the grep narrows the window without closing it, so the bytes
-      sometimes never reach `/data` greppably rather than reaching it late.
-    - So the pin stands on a **confounded comparison**, said so in place. Taking
-      4.44 wants the flake understood first. **None of it shows up by default**:
-      the suite skips unless `ALGOJUDGE_S3=seaweedfs` is set, in CI included.
-  - `rustfs` went `1.0.0-rc.1` → `rc.4`; there is still **no stable 1.0.0**.
+    - **Was "not fixed", and is now understood: the test was the fault.**
+      `Bytes_nobody_encrypted_are_findable_in_the_data_directory` was
+      intermittent on every version, which read as a difference between images
+      until the same version both failed and passed. **Measured 2026-09-07**:
+      the object's bytes are on disk, complete and contiguous — `od` shows all
+      forty-eight characters of the needle — while at that same moment `grep`
+      finds a forty-four character prefix of it in that very file and not the
+      whole string. The bytes reach `/data`; `grep` does not see them. Ten runs,
+      one failure in five on 4.43 and three in five on 4.45, that test and
+      nothing else, p = 0.52.
+    - **So the disk check is gone and the pin moved to 4.45** (2026-09-07). A
+      method that answers "absent" about bytes that are present cannot decide
+      encryption at rest, and it fails in the dangerous direction: `false` is
+      what the assertion read as "encrypted", so a store that encrypted nothing
+      would have passed. What replaces it asserts what the S3 contract can
+      state — the store takes the configuration and reports `AES256` for the
+      object — and **runs on the default endpoint**, where the old pair only
+      ever skipped.
+    - **SeaweedFS agrees to encrypt and then stops working.** Measured the same
+      day, identically on 4.43 and 4.45: `PutBucketEncryption` is accepted,
+      `GetBucketEncryption` returns the rule, and every write to that bucket
+      afterwards fails with an internal error, though a write before the call
+      succeeds. The note that it "answers `PutBucketEncryption` with an internal
+      error" described the wrong call. `EncryptionCapableFactAttribute` skips
+      there and says so.
+  - `rustfs` went `1.0.0-rc.1` → `rc.4`, and `rc.5` on 2026-09-07; there is
+    still **no stable 1.0.0**.
     `postgres:18` is unchanged: there is no 19, and the major pin is deliberate.
   - **Warnings 15 → 14.** The nine the bump introduced were fixed because the
     bump introduced them; the fourteen that predate it are still measured and

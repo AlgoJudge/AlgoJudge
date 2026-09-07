@@ -8,7 +8,7 @@ namespace AlgoJudge.Server.Tests;
 /// <para>
 /// <b>This is the guard on hand-written SQL.</b> <c>FileContents</c> is not an
 /// EF entity, so it is created by a <c>migrationBuilder.Sql</c> block at the end
-/// of <c>InitialCreate</c> — the one part of that file the model does not
+/// of <c>version_0_1_0</c> — the one part of that file the model does not
 /// generate, and therefore the one part a regeneration would silently drop.
 /// Everything below fails if it goes.
 /// </para>

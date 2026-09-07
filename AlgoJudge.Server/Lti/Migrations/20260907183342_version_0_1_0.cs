@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace AlgoJudge.Server.Lti.Migrations
 {
     /// <inheritdoc />
-    public partial class LtiInitialCreate : Migration
+    public partial class version_0_1_0 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
