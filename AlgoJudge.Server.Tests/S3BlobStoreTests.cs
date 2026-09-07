@@ -133,9 +133,9 @@ public sealed class S3BlobStoreTests : BlobStoreContract, IAsyncLifetime
     /// assumed.</b> These stores open their port in about 100 ms and answer
     /// seconds later — 2.1 s for SeaweedFS 4.43, 3.1 s for 4.44 — and waiting on
     /// an HTTP answer does not close the gap either, because a 403 comes from
-    /// the auth layer before the filer behind it can serve a bucket. Pinned to
-    /// 4.43, the suite was not correct, only fast enough; one second of startup
-    /// was the whole difference between green and three failures.
+    /// the auth layer before the filer behind it can serve a bucket. While the
+    /// pin sat at 4.43 the suite was not correct, only fast enough; one second
+    /// of startup was the whole difference between green and three failures.
     /// </para>
     /// <para>
     /// <b>It retries the probe, not the assertions.</b> What comes back is the
