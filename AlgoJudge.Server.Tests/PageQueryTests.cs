@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using AlgoJudge.Server.Database;
 using AlgoJudge.Server.Services.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace AlgoJudge.Server.Tests;
 
@@ -94,5 +96,123 @@ public class PagingOverflowTests(ServerFixture server)
             participant, $"/api/v1/activities/{slug}/submissions?page=1&pageSize=20");
 
         Assert.Single(body.GetProperty("items").EnumerateArray());
+    }
+}
+
+/// <summary>
+/// A filter narrows what is paged — not the page that has already been taken.
+/// <para>
+/// <c>ListSubmissionsAsync</c> read the state and the verdict off the newest
+/// attempt and applied them to the page <b>after</b> the database had produced
+/// it. So a filter answered with whichever matches happened to fall on the page
+/// asked for: a manager who narrowed an activity down to one submission was
+/// shown an empty first page with the match on the second, and the pager offered
+/// pages that were empty by construction because <c>total</c> counted rows the
+/// filter would have removed. Reported from production on 2026-09-08.
+/// </para>
+/// <para>
+/// A page of one is the whole of the reproduction: the match is the older of two
+/// submissions, so an unfiltered listing puts it on page two.
+/// </para>
+/// </summary>
+[Collection("server-2")]
+public class FilteredListingTests(ServerFixture server)
+{
+    private static async Task<HttpClient> AdminAsync(ServerFixture server) =>
+        await Sign.InAsync(server, Seeder.DevAdminLogin, Seeder.DevAdminPassword);
+
+    private async Task<string> ActivityIdAsync(string slug)
+    {
+        await using var context = server.NewContext();
+        return (await context.Activities.AsNoTracking().FirstAsync(a => a.Slug == slug)).Id.ToString();
+    }
+
+    /// <summary>Judged, so the row carries a verdict and a finished state.</summary>
+    private async Task<string> JudgedAsync(HttpClient participant, string slug, string verdict)
+    {
+        var submitted = await Build.SubmitAsync(participant, slug, $"print(1)  # {verdict}\n");
+        var id = submitted.GetProperty("id").GetString()!;
+
+        var runner = await Build.RunnerAsync(server);
+        var job = await runner.ClaimUntilAsync(id);
+        await runner.ReportAsync(
+            job.GetProperty("jobId").GetString()!,
+            job.GetProperty("leaseToken").GetString()!,
+            verdict: verdict);
+
+        return id;
+    }
+
+    [Fact]
+    public async Task A_match_beyond_the_first_page_is_on_the_first_page_once_filtered()
+    {
+        var (slug, _) = await Build.ActivityAsync(server);
+        var participant = await Build.ParticipantAsync(server, slug);
+        var admin = await AdminAsync(server);
+
+        var wanted = await JudgedAsync(participant, slug, "Wrong answer");
+        await JudgedAsync(participant, slug, "Accepted");
+
+        var activityId = await ActivityIdAsync(slug);
+        var page = await Build.GetAsync(
+            admin,
+            $"/api/v1/submissions?page=1&pageSize=1&activityId={activityId}&verdict=Wrong%20answer");
+
+        var row = Assert.Single(page.GetProperty("items").EnumerateArray());
+        Assert.Equal(wanted, row.GetProperty("id").GetString());
+
+        // The count is of what matched, so the pager offers the one page there is.
+        Assert.Equal(1, page.GetProperty("total").GetInt32());
+    }
+
+    /// <summary>
+    /// The same for the state, which is the filter the report came in about, and
+    /// which is read off the newest attempt rather than off a column.
+    /// </summary>
+    [Fact]
+    public async Task The_state_filter_counts_and_pages_what_matched()
+    {
+        var (slug, _) = await Build.ActivityAsync(server);
+        var participant = await Build.ParticipantAsync(server, slug);
+        var admin = await AdminAsync(server);
+
+        await JudgedAsync(participant, slug, "Accepted");
+        await JudgedAsync(participant, slug, "Accepted");
+        var activityId = await ActivityIdAsync(slug);
+
+        var completed = await Build.GetAsync(
+            admin, $"/api/v1/submissions?page=1&pageSize=1&activityId={activityId}&state=completed");
+
+        Assert.Single(completed.GetProperty("items").EnumerateArray());
+        Assert.Equal(2, completed.GetProperty("total").GetInt32());
+
+        // Nothing here is waiting, so the filter that would once have answered
+        // with whatever sat on page one answers with nothing at all.
+        var queued = await Build.GetAsync(
+            admin, $"/api/v1/submissions?page=1&pageSize=20&activityId={activityId}&state=queued");
+
+        Assert.Empty(queued.GetProperty("items").EnumerateArray());
+        Assert.Equal(0, queued.GetProperty("total").GetInt32());
+    }
+
+    /// <summary>
+    /// A state the product has no name for matches nothing. It is not read as
+    /// the default, which would answer a question nobody asked.
+    /// </summary>
+    [Fact]
+    public async Task A_state_nothing_can_be_in_matches_nothing()
+    {
+        var (slug, _) = await Build.ActivityAsync(server);
+        var participant = await Build.ParticipantAsync(server, slug);
+        var admin = await AdminAsync(server);
+
+        await Build.SubmitAsync(participant, slug, "print(1)\n");
+
+        var activityId = await ActivityIdAsync(slug);
+        var page = await Build.GetAsync(
+            admin, $"/api/v1/submissions?page=1&pageSize=20&activityId={activityId}&state=nonsense");
+
+        Assert.Empty(page.GetProperty("items").EnumerateArray());
+        Assert.Equal(0, page.GetProperty("total").GetInt32());
     }
 }

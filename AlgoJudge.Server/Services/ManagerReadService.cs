@@ -158,18 +158,56 @@ namespace AlgoJudge.Server.Services
                     || s.User!.UserName!.ToLower().Contains(needle));
             }
 
+            // **State and verdict are the newest attempt's, and they narrow the
+            // query rather than the page.** They were applied after paging until
+            // 2026-09-08, which meant a filter answered with whichever matches
+            // happened to fall on the page asked for: a single match sitting
+            // beyond the first page left that page empty, and `total` counted
+            // rows the filter would have removed, so the pager offered pages
+            // that were empty by construction.
+            //
+            // The subquery makes the same choice `Scoring.Current` does — the
+            // highest attempt number — and the two must not drift apart, or a
+            // row would be filtered on one attempt and rendered from another.
+            if (state is not null)
+            {
+                var wanted = state switch
+                {
+                    "queued" => EvaluationJobState.Queued,
+                    "running" => EvaluationJobState.Running,
+                    "completed" => EvaluationJobState.Completed,
+                    "failed" => EvaluationJobState.Failed,
+                    "cancelled" => EvaluationJobState.Cancelled,
+                    "superseded" => EvaluationJobState.Superseded,
+                    _ => (EvaluationJobState?)null,
+                };
+
+                // A submission with no job at all reads as queued, which is what
+                // `Project` reports for one; a state nothing can be in matches
+                // nothing rather than being read as the default.
+                query = wanted is { } value
+                    ? query.Where(s => (s.Jobs
+                        .OrderByDescending(j => j.Attempt)
+                        .Select(j => (EvaluationJobState?)j.State)
+                        .FirstOrDefault() ?? EvaluationJobState.Queued) == value)
+                    : query.Where(s => false);
+            }
+
+            if (verdict is not null)
+            {
+                query = query.Where(s => s.Jobs
+                    .OrderByDescending(j => j.Attempt)
+                    .Select(j => j.Result!.Verdict)
+                    .FirstOrDefault() == verdict);
+            }
+
             var total = await query.CountAsync(ct);
             var page = await query
                 .OrderByDescending(s => s.CreatedDate).ThenByDescending(s => s.Id)
                 .Skip(paging.Skip).Take(paging.PageSize)
                 .ToListAsync(ct);
 
-            // State and verdict live on the newest job, which EF cannot filter
-            // on without loading it — so they are applied here, after paging,
-            // and the count above is of what matched the rest.
             var items = page.Select(Project).ToList();
-            if (state is not null) items = items.Where(s => s.State == state).ToList();
-            if (verdict is not null) items = items.Where(s => s.Verdict == verdict).ToList();
 
             return new PageDto<ManagedSubmissionDto>
             {
