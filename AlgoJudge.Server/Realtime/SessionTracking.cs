@@ -46,11 +46,47 @@ namespace AlgoJudge.Server.Realtime
         /// </summary>
         public const string SessionCookie = "aj_session";
 
+        /// <summary>
+        /// The mark that says this request ended the session, so the touch below
+        /// does not immediately start another.
+        ///
+        /// <para>
+        /// The order is what makes it necessary: this middleware does its work
+        /// <b>after</b> the request has been handled, so on a sign-out it runs
+        /// once the row has been closed and the cookie removed — sees a
+        /// principal that is still on the request, finds no open row for it, and
+        /// helpfully opens one, handing the browser a fresh session cookie on
+        /// the way out.
+        /// </para>
+        /// </summary>
+        private const string EndedItem = "aj-session-ended";
+
+        /// <summary>Called by the sign-out, which is the only thing that ends one.</summary>
+        public static void Ended(HttpContext http) => http.Items[EndedItem] = true;
+
+        /// <summary>
+        /// Drops one session from the throttle above.
+        ///
+        /// <para>
+        /// <b>It exists for a test, and says so rather than pretending
+        /// otherwise.</b> The guard this class keeps — not opening a fresh row
+        /// on the very request that ended one — is unreachable while the
+        /// throttle is holding, because a session touched in the last minute
+        /// makes this middleware return before it decides anything. A test that
+        /// signs in and immediately signs out is exactly that case, so removing
+        /// the guard left it green. One line of visibility buys an assertion
+        /// that fails when the guard is taken away.
+        /// </para>
+        /// </summary>
+        internal static void Forget(Guid session) => Touched.TryRemove(session, out _);
+
         public async Task InvokeAsync(
             HttpContext http, ApplicationDbContext context, TimeProvider clock,
             Services.IRequestOrigin origin, IConfiguration configuration)
         {
             await next(http);
+
+            if (http.Items.TryGetValue(EndedItem, out var ended) && ended is true) return;
 
             var userId = http.User?.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(userId)) return;
@@ -85,8 +121,17 @@ namespace AlgoJudge.Server.Realtime
                 return;
             }
 
+            // **Whose session, and not only which.** The id alone let a row
+            // outlive the person it belongs to: signing out did not close it and
+            // did not remove the cookie, so the next account signed in on that
+            // browser was recorded against the previous account's session — the
+            // second person got no row of their own, and the first was shown one
+            // on their sessions screen that was somebody else at the keyboard.
+            // With the user in the predicate a stale cookie simply misses, and
+            // the branch below mints a row and a cookie for whoever is here now.
             var session = sessionId is { } id
-                ? await context.UserSessions.FirstOrDefaultAsync(s => s.Id == id && s.EndedAt == null)
+                ? await context.UserSessions.FirstOrDefaultAsync(
+                    s => s.Id == id && s.UserId == userId && s.EndedAt == null)
                 : null;
 
             if (session is null)
