@@ -298,6 +298,12 @@ namespace AlgoJudge.Server.Database
                 ScoreVisibility = ScoreVisibility.Everyone,
                 JoinPolicy = JoinPolicy.Open,
                 Unlisted = false,
+                // Published, as creating one through the API publishes it. Seeded
+                // rows were written straight to the table and left this null, so
+                // the fixture activity was one nobody had published — which
+                // `GetAsync` has always answered 404 for, and which enrolling
+                // stopped accepting on 2026-09-09.
+                PublishedAt = DateTime.UtcNow,
                 MaxUploadBytes = 1024 * 1024,
                 MaxAttachments = 1,
             };

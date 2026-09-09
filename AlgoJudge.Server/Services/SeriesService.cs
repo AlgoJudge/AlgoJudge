@@ -40,8 +40,13 @@ namespace AlgoJudge.Server.Services
             string activityIdOrSlug, CancellationToken ct)
         {
             var activity = await activities.ResolveAsync(activityIdOrSlug, ct);
+            await activities.RequireVisibleAsync(activity, ct);
             await permissions.RequireAsync(Permissions.ActivityRead, activity.Id, ct);
             var user = await currentUser.RequireAsync(ct);
+            // Membership, which a permission does not answer: a participant's
+            // keys held at system scope reach every activity, and being in one
+            // is a different question. See `Membership`.
+            await Membership.RequireAsync(context, permissions, activity.Id, user.Id, ct);
 
             var all = await context.Series
                 .AsNoTracking()

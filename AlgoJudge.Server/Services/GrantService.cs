@@ -324,9 +324,12 @@ namespace AlgoJudge.Server.Services
             // declares a scope for all 52, but five of the shipped `manager`
             // template's are `Global` — the `problem:*` ones — and the panel
             // applies that template to activity grants. Refusing every misplaced
-            // global key would refuse the template this product ships. That
-            // those five are equally inert there is a separate defect, pinned by
-            // `A_global_key_in_an_activity_grant_does_nothing`.
+            // global key would refuse the template this product ships.
+            //
+            // Those five are no longer inert there: since 2026-09-09 the problem
+            // library asks for them **anywhere** rather than at system scope, so
+            // an activity grant carries them. What the declaration means is
+            // therefore documentation, and only this key's scope is a rule.
             if (activityId is not null && wanted.Contains(Permissions.SystemAdministrator))
             {
                 throw new ValidationException(

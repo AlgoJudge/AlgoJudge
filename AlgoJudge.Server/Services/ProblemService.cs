@@ -265,7 +265,19 @@ namespace AlgoJudge.Server.Services
                 {
                     throw new ConflictException($"This version already has a file called {name}", "version.file.duplicate");
                 }
-                if (!await context.Files.AnyAsync(f => f.Id == fileId, ct))
+                // **Readable by this caller, not merely present.** Existence was
+                // the whole test until 2026-09-09, and a reference is a read
+                // grant: attaching an arbitrary id at participant scope and then
+                // fetching it turned `problem:update` into a way to read another
+                // activity's submission source, an attempt's log or a Runner's.
+                // `RunnerService.IsOwnUploadAsync` closed exactly this on the
+                // Runner side; `TrialService` asks the same question before it
+                // queues a package.
+                //
+                // The ordinary flow is unaffected: whoever uploads a file may
+                // read it while it is unreferenced, which is what publishing a
+                // version does one call earlier.
+                if (!await files.CanReadAsync(fileId, ct))
                 {
                     throw new ValidationException($"No such file: {fileId}", "file.missing");
                 }
@@ -653,9 +665,14 @@ namespace AlgoJudge.Server.Services
             string activityIdOrSlug, string problemSlug, CancellationToken ct)
         {
             var activity = await activities.ResolveAsync(activityIdOrSlug, ct);
+            await activities.RequireVisibleAsync(activity, ct);
             await permissions.RequireAsync(Permissions.ActivityRead, activity.Id, ct);
             await lockdown.RequireReachableAsync(activity.Id, ct);
             var user = await currentUser.RequireAsync(ct);
+            // Membership, which a permission does not answer: a participant's
+            // keys held at system scope reach every activity, and being in one
+            // is a different question. See `Membership`.
+            await Membership.RequireAsync(context, permissions, activity.Id, user.Id, ct);
 
             var assignment = await context.SeriesProblems
                 .Include(sp => sp.Series)

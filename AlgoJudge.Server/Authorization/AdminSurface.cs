@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
 using AlgoJudge.Server.Utils;
@@ -60,6 +61,27 @@ namespace AlgoJudge.Server.Authorization
         /// </summary>
         public const string DevelopmentToken = "admin-token-development-only";
 
+        /// <summary>
+        /// Whether the configured token may be used at all.
+        /// <para>
+        /// Absent, empty or whitespace closes the group: there is no "no token
+        /// means no check" reading of this, because the failure has to shut the
+        /// door rather than open it. <b>The shipped development value closes it
+        /// too, everywhere but Development.</b> That value is in a compose file
+        /// in a public repository, and the peer address beside it is not a
+        /// second factor wherever a proxy on the same host reaches the Server
+        /// over loopback. Until 2026-09-09 the start warned and served it.
+        /// </para>
+        /// </summary>
+        /// <remarks>
+        /// Internal so the rule can be asserted directly: the test fixture runs in
+        /// Development, where this deliberately allows the shipped value, so the
+        /// refusal cannot be reached through the HTTP surface there.
+        /// </remarks>
+        internal static bool Usable([NotNullWhen(true)] string? configured, bool development) =>
+            !string.IsNullOrWhiteSpace(configured)
+            && (development || configured != DevelopmentToken);
+
         public static IApplicationBuilder UseAdminSurfaceRules(this IApplicationBuilder app) =>
             app.Use(async (context, next) =>
             {
@@ -82,13 +104,11 @@ namespace AlgoJudge.Server.Authorization
                 // not exist.
                 if (!Peer.IsLoopback(context)) throw new NotFoundException("Endpoint");
 
-                var configured = context.RequestServices
-                    .GetRequiredService<IConfiguration>()[TokenSetting];
+                var services = context.RequestServices;
+                var configured = services.GetRequiredService<IConfiguration>()[TokenSetting];
+                var development = services.GetRequiredService<IHostEnvironment>().IsDevelopment();
 
-                // Absent, empty or whitespace closes the whole group. There is
-                // no "no token means no check" reading of this — the failure has
-                // to shut the door rather than open it.
-                if (string.IsNullOrWhiteSpace(configured)) throw new NotFoundException("Endpoint");
+                if (!Usable(configured, development)) throw new NotFoundException("Endpoint");
 
                 var presented = context.Request.Headers[TokenHeader].ToString();
                 if (!Matches(presented, configured)) throw new NotFoundException("Endpoint");

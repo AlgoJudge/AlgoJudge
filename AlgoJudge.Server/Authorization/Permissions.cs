@@ -43,7 +43,8 @@ namespace AlgoJudge.Server.Authorization
     /// The permission catalogue: the whole vocabulary, in one place, because the
     /// Server is what enforces it.
     /// <para>
-    /// Mirrors <c>docs/specs/PERMISSIONS.md</c>. The Client fetches this rather
+    /// Mirrors <c>docs/specs/PERMISSIONS.md</c> in the workspace repository,
+    /// not in this one, and `scripts/check-permissions.py` there compares them. The Client fetches this rather
     /// than hard-coding it, so an installation that adds an entry does not need a
     /// Client release to show it.
     /// </para>

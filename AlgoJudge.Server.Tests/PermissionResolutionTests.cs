@@ -89,11 +89,16 @@ public class PermissionResolutionTests(ServerFixture server)
     /// <summary>
     /// <b>Why the rule above names one key instead of reading the catalogue.</b>
     /// Five of the shipped <c>manager</c> template's keys are declared
-    /// <c>PermissionScope.Global</c> — the <c>problem:*</c> ones — and
-    /// <c>ProblemService</c> requires them with no activity, which unions system
-    /// grants only. So a manager granted the template <i>on an activity</i>, the
-    /// way the seeder and the panel apply it, holds five permissions that do
-    /// nothing.
+    /// <c>PermissionScope.Global</c> — the <c>problem:*</c> ones — while the
+    /// template is applied to <i>activity</i> grants by the seeder and the panel.
+    /// <para>
+    /// <b>They are not inert any more.</b> Since 2026-09-09 the problem library
+    /// asks for them with <c>RequireAnywhereAsync</c>, so an activity grant
+    /// carries them and a manager of one course has their own library. What this
+    /// test still pins is narrower and still true: <c>/permissions/mine</c> at
+    /// system scope does not report a key held only on an activity, because that
+    /// endpoint answers about a scope rather than about what will be allowed.
+    /// </para>
     /// <para>
     /// This test asserts the current behaviour rather than the desired one, so
     /// that fixing it is a decision somebody takes rather than a surprise. Until
