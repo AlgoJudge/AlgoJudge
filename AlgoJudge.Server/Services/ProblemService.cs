@@ -114,7 +114,7 @@ namespace AlgoJudge.Server.Services
         {
             var user = await currentUser.RequireAsync(ct);
             var seesEverything = await permissions.HasAsync(Permissions.ProblemReadAll, null, ct);
-            if (!seesEverything) await permissions.RequireAsync(Permissions.ProblemReadOwn, null, ct);
+            if (!seesEverything) await permissions.RequireAnywhereAsync(Permissions.ProblemReadOwn, ct);
 
             var query = context.Problems
                 .Include(p => p.SharedWith)
@@ -175,7 +175,7 @@ namespace AlgoJudge.Server.Services
 
         public async Task<ManagedProblemDto> CreateAsync(ProblemInputDto input, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.ProblemCreate, null, ct);
+            await permissions.RequireAnywhereAsync(Permissions.ProblemCreate, ct);
             var user = await currentUser.RequireAsync(ct);
 
             var slug = input.Slug?.Trim() ?? "";
@@ -218,7 +218,7 @@ namespace AlgoJudge.Server.Services
         public async Task<ManagedProblemVersionDto> PublishVersionAsync(
             Guid problemId, ProblemVersionInputDto input, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.ProblemUpdate, null, ct);
+            await permissions.RequireAnywhereAsync(Permissions.ProblemUpdate, ct);
             var user = await currentUser.RequireAsync(ct);
 
             var problem = await context.Problems.FirstOrDefaultAsync(p => p.Id == problemId, ct)
@@ -385,7 +385,7 @@ namespace AlgoJudge.Server.Services
 
         public async Task<ManagedProblemDto> UpdateAsync(Guid id, ProblemInputDto input, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.ProblemUpdate, null, ct);
+            await permissions.RequireAnywhereAsync(Permissions.ProblemUpdate, ct);
             var problem = await LoadAsync(id, ct);
             await RequireReadableAsync(problem, ct);
 
@@ -444,7 +444,7 @@ namespace AlgoJudge.Server.Services
         /// </summary>
         public async Task<ManagedProblemDto> SetArchivedAsync(Guid id, bool archived, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.ProblemArchive, null, ct);
+            await permissions.RequireAnywhereAsync(Permissions.ProblemArchive, ct);
             var problem = await LoadAsync(id, ct);
             await RequireReadableAsync(problem, ct);
 
@@ -465,7 +465,7 @@ namespace AlgoJudge.Server.Services
         /// </summary>
         public async Task<ManagedProblemDto> DuplicateAsync(Guid id, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.ProblemCreate, null, ct);
+            await permissions.RequireAnywhereAsync(Permissions.ProblemCreate, ct);
             var source = await LoadAsync(id, ct);
             await RequireReadableAsync(source, ct);
             var user = await currentUser.RequireAsync(ct);
@@ -541,7 +541,7 @@ namespace AlgoJudge.Server.Services
         public async Task<ManagedProblemDto> SetVisibilityAsync(
             Guid id, string visibility, IReadOnlyList<string>? sharedWith, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.ProblemShare, null, ct);
+            await permissions.RequireAnywhereAsync(Permissions.ProblemShare, ct);
             var problem = await LoadAsync(id, ct);
             await RequireReadableAsync(problem, ct);
 
@@ -617,7 +617,7 @@ namespace AlgoJudge.Server.Services
         public async Task<(Stream Bytes, string Name)?> PackageAsync(
             Guid problemId, Guid versionId, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.ProblemUpdate, null, ct);
+            await permissions.RequireAnywhereAsync(Permissions.ProblemUpdate, ct);
             var problem = await LoadAsync(problemId, ct);
             await RequireReadableAsync(problem, ct);
 

@@ -434,9 +434,14 @@ namespace AlgoJudge.Server.Services
 
             // Manager scope is where a model solution lives. Never a participant,
             // never a Runner reading it as a participant would.
+            //
+            // **Anywhere, not at system scope.** The library these files belong
+            // to admits whoever manages an activity, so a manager who may open a
+            // problem must be able to read its bytes; asking at system scope let
+            // them open the screen and not the file.
             if (reference.Scope == FileScope.Manager)
             {
-                return await permissions.HasAsync(Authorization.Permissions.ProblemUpdate, null, ct);
+                return await permissions.HasAnywhereAsync(Authorization.Permissions.ProblemUpdate, ct);
             }
 
             // Runner scope: the package. Readable by a Runner holding a job for
@@ -444,7 +449,7 @@ namespace AlgoJudge.Server.Services
             // a Runner — and by managers.
             if (reference.Scope == FileScope.Runner)
             {
-                return await permissions.HasAsync(Authorization.Permissions.ProblemUpdate, null, ct);
+                return await permissions.HasAnywhereAsync(Authorization.Permissions.ProblemUpdate, ct);
             }
 
             // Participant scope: readable from **any assignment of this version
