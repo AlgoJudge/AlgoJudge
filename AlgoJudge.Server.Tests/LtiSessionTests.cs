@@ -166,6 +166,71 @@ public class LtiSessionTests(ServerFixture server)
         Assert.DoesNotContain("partitioned", identity, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// And the way out of one, which is the half that was missing.
+    ///
+    /// <para>
+    /// <b>A cookie is deleted by writing it again, and a browser matches the
+    /// deletion against the attributes it was set with.</b> `Partitioned` is the
+    /// one that decides: the cookie lives in a jar keyed to the site that did
+    /// the embedding, and a deletion written without the attribute reaches a
+    /// different jar and removes nothing. Signing out then answered 204 with
+    /// the session still valid — reported from production on 2026-09-09, from a
+    /// Moodle launch, and not reproducible in a private window because there is
+    /// no partitioned cookie there to miss.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>The assertion is on the header, not on a later 401</b>, and that is
+    /// the same limit the sign-in test above records. `CookieContainer` matches
+    /// on name, domain and path and ignores both `Partitioned` and `SameSite`,
+    /// so this client drops the cookie either way and a 401 would be green with
+    /// the defect in place. What a browser does with the header is the thing
+    /// under test, and the header is all of it a test can hold.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task A_launch_is_signed_out_with_the_cookie_it_was_signed_in_with()
+    {
+        var world = await LaunchAsync();
+
+        var response = await world.Client.PostAsync("/api/v1/identity/logout", null);
+        response.EnsureSuccessStatusCode();
+
+        var deleted = response.Headers.GetValues("Set-Cookie")
+            .First(c => c.StartsWith(".AspNetCore.Identity.Application"));
+
+        Assert.Contains("samesite=none", deleted, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("secure", deleted, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("partitioned", deleted, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// And the ordinary sign-out keeps the narrow deletion, for the same reason
+    /// the ordinary sign-in keeps the narrow cookie: widening everything is
+    /// simpler to write and gives up what `Lax` buys on every screen that has
+    /// nothing to do with a frame.
+    /// </summary>
+    [Fact]
+    public async Task An_ordinary_sign_out_stays_narrow()
+    {
+        var client = server.CreateClient();
+
+        (await client.PostAsJsonAsync(
+            "/api/v1/identity/login?useCookies=true",
+            new { email = Seeder.DevAdminLogin, password = Seeder.DevAdminPassword }))
+            .EnsureSuccessStatusCode();
+
+        var response = await client.PostAsync("/api/v1/identity/logout", null);
+        response.EnsureSuccessStatusCode();
+
+        var deleted = response.Headers.GetValues("Set-Cookie")
+            .First(c => c.StartsWith(".AspNetCore.Identity.Application"));
+
+        Assert.Contains("samesite=lax", deleted, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("partitioned", deleted, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ── Getting there ────────────────────────────────────────────────────────
 
     private sealed record World(

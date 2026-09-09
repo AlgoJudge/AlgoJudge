@@ -169,6 +169,38 @@ namespace AlgoJudge.Server
                         Authorization.EmbeddedSessions.Mark(context.HttpContext);
                     }
                 };
+
+                // **The other half, and without it there was no way out of an
+                // embedded session at all.**
+                //
+                // A cookie is deleted by writing it again, empty and expired,
+                // and a browser only matches that against a cookie with the
+                // same attributes. `Partitioned` is the one that decides here:
+                // a partitioned cookie lives in a jar of its own, keyed to the
+                // site that did the embedding, so a deletion written without
+                // the attribute reaches a different jar and removes nothing.
+                //
+                // The sign-out then answered 204 with the session still valid,
+                // which is the worst shape this can take: the interface says it
+                // worked, and the next person at the keyboard is signed in as
+                // the previous one. Reported from production on 2026-09-09,
+                // after a launch from Moodle, and it does not reproduce in a
+                // private window — there is no partitioned cookie there to miss.
+                //
+                // Asked of the ticket being signed out rather than of the
+                // request, for the same reason the sign-in half exists: only
+                // the sessions that asked to be widened are widened.
+                var signingOut = options.Events.OnSigningOut;
+                options.Events.OnSigningOut = async context =>
+                {
+                    if (signingOut is not null) await signingOut(context);
+                    if (await Authorization.EmbeddedSessions.IsEmbeddedAsync(
+                            context.HttpContext,
+                            Microsoft.AspNetCore.Identity.IdentityConstants.ApplicationScheme))
+                    {
+                        Authorization.EmbeddedSessions.Widen(context.CookieOptions);
+                    }
+                };
             });
 
             // The external cookie — where a provider's ticket waits between the
