@@ -23,6 +23,12 @@ namespace AlgoJudge.Server.Tests;
 /// platform arrives with a signed launch and no account yet. Adding a line here
 /// is a decision; the comment beside it is where the decision is written down.
 /// </para>
+/// <para>
+/// <b>One address is answered without being an endpoint</b>, and so cannot
+/// appear below: <c>/robots.txt</c>, which middleware answers in front of both
+/// routing and the API-base guard because a robots file is only ever read at the
+/// root of a host. <c>CrawlerSurfaceTests</c> is its census.
+/// </para>
 /// </summary>
 [Collection("server-1")]
 public class EndpointCensusTests(ServerFixture server)

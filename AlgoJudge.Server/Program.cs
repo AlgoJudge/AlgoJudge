@@ -430,6 +430,73 @@ namespace AlgoJudge.Server
             // prefix exists to prevent — a Client asking a correct host for the
             // wrong path would be answered instead of corrected. So the guard is
             // explicit, and it runs before the base is stripped.
+            // **`noindex` on everything this Server answers.**
+            //
+            // A `Disallow` keeps a crawler from *fetching* a URL; it is this
+            // header that keeps one out of an index, and only this header
+            // survives the case the robots file cannot reach — an installation
+            // that serves the API from a host of its own, where the Client's
+            // file governs nothing.
+            //
+            // **Public files carry it too**, deliberately. A crawler still
+            // fetches them, which is what a rendered page needs, and a `noindex`
+            // on a resource does not stop the page that draws it being indexed.
+            // What it does stop is the terms of service being indexed twice —
+            // once as the Client's own page and once as the raw document behind
+            // it, competing with each other.
+            //
+            // `OnStarting` rather than a plain assignment: `UseExceptionHandler`
+            // clears the response before it writes a failure, and a header set
+            // on the way in would go with it.
+            app.Use((context, next) =>
+            {
+                context.Response.OnStarting(() =>
+                {
+                    context.Response.Headers["X-Robots-Tag"] = "noindex";
+                    return Task.CompletedTask;
+                });
+
+                return next();
+            });
+
+            // **At the host root, which is why it is in front of the guard
+            // below.** A robots file is only ever read at `/robots.txt`, and
+            // everything this Server answers otherwise lives under `/api/v1` —
+            // so the guard would 404 it, and mapping it as an endpoint would
+            // publish it one directory down where nothing looks.
+            //
+            // It matters in one deployment: an API on a host of its own. Where
+            // one origin serves both halves, the Client's file is what answers
+            // and this is never reached. The two say the same thing, and for the
+            // same reason — a page a crawler renders draws the operator's logo
+            // and documents from `/api/v1/files/`, so that prefix has to stay
+            // fetchable while the rest of the API does not.
+            app.Use(async (context, next) =>
+            {
+                if (!context.Request.Path.Equals("/robots.txt", StringComparison.OrdinalIgnoreCase))
+                {
+                    await next();
+                    return;
+                }
+
+                context.Response.ContentType = "text/plain; charset=utf-8";
+                await context.Response.WriteAsync("""
+                    # This host serves an API. Nothing here is a page.
+                    #
+                    # The one exception is a stored file: an installation's logo and
+                    # its published documents are drawn by pages on the application's
+                    # own host, and a crawler that may not fetch them renders those
+                    # pages without them. Every id is authorised and answers 404 to a
+                    # caller who may not read it, so this opens nothing.
+                    #
+                    # Everything reachable here also carries `X-Robots-Tag: noindex`.
+
+                    User-agent: *
+                    Allow: /api/v1/files/
+                    Disallow: /
+                    """);
+            });
+
             app.Use(async (context, next) =>
             {
                 if (!context.Request.Path.StartsWithSegments(ApiPathBase, StringComparison.OrdinalIgnoreCase))
