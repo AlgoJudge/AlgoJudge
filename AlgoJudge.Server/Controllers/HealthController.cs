@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using AlgoJudge.Server.Api.Contracts;
 using AlgoJudge.Server.Database.Models;
 using AlgoJudge.Server.Services;
@@ -24,6 +25,9 @@ namespace AlgoJudge.Server.Controllers
     /// </summary>
     [ApiController]
     [Route("health")]
+    // Said in prose above since this endpoint existed; said to the framework
+    // here, because the fallback policy closes everything that does not.
+    [AllowAnonymous]
     public class HealthController(
         IMaintenanceService maintenance,
         Storage.IStorageHealth storage

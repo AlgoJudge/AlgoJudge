@@ -4,6 +4,7 @@ using AlgoJudge.Server.Database.Models;
 using AlgoJudge.Server.Services;
 using AlgoJudge.Server.Realtime;
 using AlgoJudge.Server.Utils;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -95,7 +96,22 @@ namespace AlgoJudge.Server
             // because it is the same subject.
             builder.Services.AddSingleton<IKeyRingOperations, KeyRingOperations>();
 
-            builder.Services.AddAuthorization();
+            // **Closed unless somebody opened it.** Without a fallback policy an
+            // endpoint carrying neither attribute is anonymous, so security is
+            // opt-in and a controller added without `[Authorize]` is a hole
+            // nothing reports. Fifteen endpoints were relying on that default —
+            // every one of them deliberately, and every one of them now saying
+            // so out loud. `EndpointCensusTests` holds the list.
+            //
+            // This is a floor, not the rule: what a caller may *do* is decided
+            // by the permission model, and several open endpoints authorise
+            // themselves in the handler because a policy cannot express what
+            // they check — a file readable through any reference, a socket
+            // handshake, a platform's signed launch.
+            builder.Services.AddAuthorization(options =>
+                options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .Build());
             builder.Services.AddIdentityApiEndpoints<User>(options =>
             {
                 // Twelve characters of anything, rather than a character-class
@@ -490,6 +506,27 @@ namespace AlgoJudge.Server
             // meant the identity cookie was never turned into a ClaimsPrincipal
             // and every [Authorize] endpoint answered 401 to a signed-in caller.
             app.UseAuthentication();
+
+            // **An address that matches nothing is a 404, not a 401.** The
+            // fallback policy set above is applied to a request with no endpoint
+            // as well — that is what it is documented to do — so with it in place
+            // every mistyped path started answering `Unauthorized`. Two things
+            // that costs: this Server's error contract says `not_found`, and the
+            // Client reads a 401 as *your session ended* and sends the reader to
+            // the sign-in screen, so a typo in an address would look like being
+            // signed out. Answered in front of authorization because there is
+            // nothing there to authorise; `UseStatusCodePages` above shapes it.
+            app.Use(async (context, next) =>
+            {
+                if (context.GetEndpoint() is null)
+                {
+                    context.Response.StatusCode = StatusCodes.Status404NotFound;
+                    return;
+                }
+
+                await next();
+            });
+
             app.UseAuthorization();
 
             // In front of the endpoints rather than around them: MapIdentityApi
@@ -521,7 +558,26 @@ namespace AlgoJudge.Server
 
             app.UseWebSockets();
 
-            app.MapGroup("/identity").MapIdentityApi<User>();
+            // **Opened one endpoint at a time, not as a group.** `MapIdentityApi`
+            // maps `manage/*` with its own authorization and the rest without
+            // any, and a group-level `AllowAnonymous()` is applied *after* an
+            // endpoint's own metadata — so it would win, and `manage/2fa` would
+            // be reachable by anybody. This adds the attribute only where the
+            // framework left none, which is exactly the set that was already
+            // anonymous. What may be reached at all is `UseIdentitySurfaceRules`
+            // above; this decides only who has to be signed in first.
+            // **`Finally`, not `Add`.** `MapIdentityApi` puts `manage/*` in a
+            // nested group and authorises that group, and a convention on the
+            // outer group runs *before* the inner one — so `Add` saw no
+            // `IAuthorizeData` on `manage/2fa` and `manage/info`, opened all
+            // three, and `EndpointCensusTests` is where that was caught rather
+            // than in production. `Finally` runs after every convention, which is
+            // the only point at which this question has an answer.
+            app.MapGroup("/identity").MapIdentityApi<User>().Finally(endpoint =>
+            {
+                if (endpoint.Metadata.OfType<IAuthorizeData>().Any()) return;
+                endpoint.Metadata.Add(new AllowAnonymousAttribute());
+            });
             app.MapControllers();
 
             AlgoJudge.Server.Lti.LtiModule.MapLti(app);

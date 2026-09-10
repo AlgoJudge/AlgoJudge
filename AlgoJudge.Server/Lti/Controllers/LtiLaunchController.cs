@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using AlgoJudge.Server.Authorization;
 using AlgoJudge.Server.Controllers;
 using AlgoJudge.Server.Lti.Services;
@@ -24,6 +25,9 @@ namespace AlgoJudge.Server.Lti.Controllers
     /// </summary>
     [ApiController]
     [Route("lti")]
+    // The launch is what creates the session; it cannot require one. What
+    // authorises it is the platform's signed JWT, checked in the handler.
+    [AllowAnonymous]
     public class LtiLaunchController(
         ILaunchService launches,
         IResourceLinkService links,

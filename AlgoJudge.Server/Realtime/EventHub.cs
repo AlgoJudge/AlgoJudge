@@ -224,6 +224,11 @@ namespace AlgoJudge.Server.Realtime
 
         public static void MapEventSocket(this WebApplication app, string path)
         {
+            // **Anonymous by attribute, authorised in the handler** — the same
+            // arrangement `GET /files/{id}` uses, and for a related reason: the
+            // refusal has to be a 401 on the handshake, which is what the Client
+            // is written to expect. The fallback policy would answer first and
+            // the check below would never run.
             app.Map(path, async (HttpContext http, IEventHub hub, ILoggerFactory loggers) =>
             {
                 if (!http.WebSockets.IsWebSocketRequest)
@@ -259,7 +264,7 @@ namespace AlgoJudge.Server.Realtime
                     hub.Remove(connection);
                     logger.LogDebug("Socket closed for {UserId}", userId);
                 }
-            });
+            }).AllowAnonymous();
         }
 
         /// <summary>

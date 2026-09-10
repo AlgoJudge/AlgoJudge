@@ -17,6 +17,7 @@ namespace AlgoJudge.Server.Controllers
     /// </summary>
     [ApiController]
     [Route("instance")]
+    [AllowAnonymous]
     public class InstanceController(IInstanceService instances) : ControllerBase
     {
         [HttpGet]

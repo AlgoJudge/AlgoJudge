@@ -20,6 +20,8 @@ namespace AlgoJudge.Server.Lti.Controllers
     /// </summary>
     [ApiController]
     [Route("lti")]
+    // A platform fetches this before there is anybody to be signed in as.
+    [AllowAnonymous]
     public class LtiKeysController(IToolKeyService keys) : ControllerBase
     {
         /// <summary>
