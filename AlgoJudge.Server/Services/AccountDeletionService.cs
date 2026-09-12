@@ -54,6 +54,7 @@ namespace AlgoJudge.Server.Services
         ICurrentUserService currentUser,
         IPermissionService permissions,
         IInstanceService instances,
+        IPrintoutService printouts,
         TimeProvider clock,
         ILogger<AccountDeletionService> log
     ) : IAccountDeletionService
@@ -323,6 +324,14 @@ namespace AlgoJudge.Server.Services
                 question.Topic = "[deleted]";
                 question.Body = "[deleted]";
             }
+
+            // **Two halves, and anonymising the name is only the first.** A
+            // printout's requester is read through the `User` navigation, so the
+            // name on a waiting sheet goes with the row above — and the source
+            // it references does not. Bytes somebody asked to have printed are
+            // theirs, and an account that has been deleted must not leave them
+            // sitting in a queue for whoever is next at the printer.
+            await printouts.DisposeOfEveryOutstandingAsync(user.Id, ct);
 
             // **Every session, not only the open ones, and the address goes with
             // the closure.** This closed what was open and left the addresses

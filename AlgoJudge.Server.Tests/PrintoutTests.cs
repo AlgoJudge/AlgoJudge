@@ -6,6 +6,9 @@ using System.Text;
 using System.Text.Json;
 using AlgoJudge.Server.Authorization;
 using AlgoJudge.Server.Database;
+using AlgoJudge.Server.Database.Models;
+using AlgoJudge.Server.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 
 namespace AlgoJudge.Server.Tests;
@@ -429,6 +432,49 @@ public class PrintoutTests(ServerFixture server)
             $"/api/v1/printouts/{printoutId}/resolve", new { outcome = "printed" });
 
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+    }
+
+    /// <summary>
+    /// Deleting an account takes its waiting sheets with it.
+    /// <para>
+    /// Anonymisation reaches the <i>name</i> for free, through the <c>User</c>
+    /// navigation. It reaches nothing at all of the source, which is the half
+    /// that would otherwise sit in the queue for whoever is next at the printer.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Deleting_an_account_disposes_of_its_waiting_sheets()
+    {
+        var (slug, _) = await Build.ActivityAsync(server);
+        await OpenPrintoutsAsync(slug);
+
+        var participant = await Build.ParticipantAsync(server, slug);
+        await Sign.Succeeded(await AskAsync(participant, slug, "print('theirs')\n", "theirs.py"));
+
+        var printoutId = await PrintoutInAsync(slug);
+        Guid fileId;
+        string userId;
+        await using (var context = server.NewContext())
+        {
+            var printout = await context.Printouts.AsNoTracking().FirstAsync(x => x.Id == printoutId);
+            userId = printout.RequestedByUserId;
+            fileId = (await context.FileReferences.AsNoTracking()
+                .FirstAsync(r => r.PrintoutId == printoutId)).FileId;
+        }
+
+        await using (var scope = server.Services.CreateAsyncScope())
+        {
+            var printouts = scope.ServiceProvider.GetRequiredService<IPrintoutService>();
+            Assert.Equal(1, await printouts.DisposeOfEveryOutstandingAsync(userId, CancellationToken.None));
+        }
+
+        await using (var context = server.NewContext())
+        {
+            Assert.False(await context.Files.AnyAsync(f => f.Id == fileId));
+            var after = await context.Printouts.AsNoTracking().FirstAsync(x => x.Id == printoutId);
+            Assert.Equal(PrintoutState.Discarded, after.State);
+            Assert.NotNull(after.SourceDisposedAt);
+        }
     }
 
     // ── The upload rules ──────────────────────────────────────────────────────
