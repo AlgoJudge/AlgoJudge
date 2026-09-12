@@ -399,9 +399,40 @@ namespace AlgoJudge.Server.Services
                     // A Runner's own diagnostics are operator material.
                     return await permissions.HasAsync(Authorization.Permissions.RunnerRead, null, ct);
 
+                case FileOwnerKind.Printout:
+                    // **At the printout's own activity, never anywhere.** The
+                    // problem library asks `HasAnywhereAsync` because a shared
+                    // problem is one library entry seen from several activities;
+                    // a printout belongs to exactly one, and somebody trusted
+                    // with the printer in one room has no business with another's
+                    // exam answers.
+                    //
+                    // `Scope` is deliberately not consulted: unlike the activity
+                    // and submission arms, there is no second audience to tell
+                    // apart here, and pretending to check it would read as a
+                    // guard that exists.
+                    return reference.PrintoutId is { } printoutId
+                        && await CanReadPrintoutAsync(printoutId, ct);
+
                 default:
                     return false;
             }
+        }
+
+        /// <summary>
+        /// Whoever works that activity's print queue, and nobody else — not even
+        /// the participant who asked, who already had the text.
+        /// </summary>
+        private async Task<bool> CanReadPrintoutAsync(Guid printoutId, CancellationToken ct)
+        {
+            var activityId = await context.Printouts
+                .AsNoTracking()
+                .Where(x => x.Id == printoutId)
+                .Select(x => (Guid?)x.ActivityId)
+                .FirstOrDefaultAsync(ct);
+
+            return activityId is { } id
+                && await permissions.HasAsync(Authorization.Permissions.PrintoutManage, id, ct);
         }
 
         private async Task<bool> CanReadActivityAsync(Guid activityId, FileScope scope, CancellationToken ct)

@@ -37,6 +37,7 @@ namespace AlgoJudge.Server.Database
         public DbSet<Result> Results { get; set; }
         public DbSet<Runner> Runners { get; set; }
         public DbSet<Question> Questions { get; set; }
+        public DbSet<Printout> Printouts { get; set; }
         public DbSet<QuestionRead> QuestionReads { get; set; }
         public DbSet<PermissionTemplate> PermissionTemplates { get; set; }
         public DbSet<Grant> Grants { get; set; }
@@ -366,6 +367,10 @@ namespace AlgoJudge.Server.Database
                     .WithMany(i => i.Files)
                     .HasForeignKey(r => r.InstanceId)
                     .OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(r => r.Printout)
+                    .WithMany(x => x.Files)
+                    .HasForeignKey(r => r.PrintoutId)
+                    .OnDelete(DeleteBehavior.Cascade);
 
                 // "May this caller read these bytes" walks from the file to its
                 // references, and the collector walks the other way.
@@ -381,7 +386,7 @@ namespace AlgoJudge.Server.Database
                     t.HasCheckConstraint(
                         "CK_FileReferences_SingleOwner",
                         "num_nonnulls(\"ProblemVersionId\", \"ActivityId\", \"SubmissionId\", " +
-                        "\"EvaluationJobId\", \"RunnerId\", \"InstanceId\") = 1");
+                        "\"EvaluationJobId\", \"RunnerId\", \"InstanceId\", \"PrintoutId\") = 1");
                     t.HasCheckConstraint(
                         "CK_FileReferences_OwnerKindMatches",
                         "(\"OwnerKind\" = 0 AND \"ProblemVersionId\" IS NOT NULL) OR " +
@@ -392,7 +397,8 @@ namespace AlgoJudge.Server.Database
                         "(\"OwnerKind\" = 5 AND \"SubmissionId\" IS NOT NULL) OR " +
                         "(\"OwnerKind\" = 6 AND \"EvaluationJobId\" IS NOT NULL) OR " +
                         "(\"OwnerKind\" = 7 AND \"InstanceId\" IS NOT NULL) OR " +
-                        "(\"OwnerKind\" = 8 AND \"InstanceId\" IS NOT NULL)");
+                        "(\"OwnerKind\" = 8 AND \"InstanceId\" IS NOT NULL) OR " +
+                        "(\"OwnerKind\" = 9 AND \"PrintoutId\" IS NOT NULL)");
                 });
             });
 
@@ -567,6 +573,38 @@ namespace AlgoJudge.Server.Database
                 e.HasOne(q => q.Author)
                     .WithMany()
                     .HasForeignKey(q => q.AuthorUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<Printout>(e =>
+            {
+                e.ToTable("Printouts");
+                // The operator's queue reads by state and age across activities;
+                // the participant's own list and the filter read by activity.
+                e.HasIndex(x => new { x.ActivityId, x.RequestedAt });
+                e.HasIndex(x => new { x.State, x.RequestedAt });
+                e.Property(x => x.Title).HasMaxLength(200);
+                e.Property(x => x.FileName).HasMaxLength(260);
+                e.Property(x => x.Sha256).HasMaxLength(64);
+                e.HasOne(x => x.Activity)
+                    .WithMany(a => a.Printouts)
+                    .HasForeignKey(x => x.ActivityId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(x => x.Submission)
+                    .WithMany()
+                    .HasForeignKey(x => x.SubmissionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(x => x.Group)
+                    .WithMany()
+                    .HasForeignKey(x => x.GroupId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                e.HasOne(x => x.RequestedBy)
+                    .WithMany()
+                    .HasForeignKey(x => x.RequestedByUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.ResolvedBy)
+                    .WithMany()
+                    .HasForeignKey(x => x.ResolvedByUserId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
 

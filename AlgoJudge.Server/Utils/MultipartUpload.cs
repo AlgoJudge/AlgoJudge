@@ -26,6 +26,19 @@ namespace AlgoJudge.Server.Utils
         /// </para>
         /// </summary>
         public const long Submission = 8L * 1024 * 1024;
+
+        /// <summary>
+        /// One page of source, on its way to a printer.
+        /// <para>
+        /// 64 KiB is about 1,500 lines of code at 40 characters a line — a
+        /// listing far longer than anybody reads on paper, and a hundred and
+        /// twenty-eight times smaller than a submission. The ceiling is small
+        /// deliberately: the queue is worked by a person carrying paper, and an
+        /// eight-megabyte archive queued for print is a jammed printer rather
+        /// than a page.
+        /// </para>
+        /// </summary>
+        public const long Printout = 64L * 1024;
     }
 
     /// <summary>

@@ -46,6 +46,18 @@ namespace AlgoJudge.Server.Database.Models
         public bool HasQuestions { get; set; } = true;
 
         /// <summary>
+        /// Whether participants may ask for source on paper.
+        /// <para>
+        /// <b>Off by default, unlike its neighbour, and that is deliberate.</b>
+        /// Questions cost an installation nothing when nobody asks one; printing
+        /// assumes somebody is standing at a printer, and an activity that has
+        /// nobody there would offer a button that leads to a queue no one works.
+        /// A module whose value depends on staffing is opted into.
+        /// </para>
+        /// </summary>
+        public bool HasPrintouts { get; set; }
+
+        /// <summary>
         /// Who sees scores, which also decides whether the ranking exists at all.
         /// There is no second switch beside it: a board turned on where nobody
         /// may see a score shows nothing, and the two settings would disagree.
@@ -175,6 +187,7 @@ namespace AlgoJudge.Server.Database.Models
 
         public ICollection<Series> Series { get; set; } = new List<Series>();
         public ICollection<Question> Questions { get; set; } = new List<Question>();
+        public ICollection<Printout> Printouts { get; set; } = new List<Printout>();
 
         /// <summary>
         /// Who reads each named attachment a submission carries.

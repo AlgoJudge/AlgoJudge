@@ -44,6 +44,13 @@ namespace AlgoJudge.Server.Database.Models
         InstanceTheme = 7,
         /// <summary>One font face the theme draws with, one file per face.</summary>
         InstanceFont = 8,
+        /// <summary>
+        /// A page of source somebody asked for on paper. The only owner kind
+        /// whose file is meant not to outlive its purpose: resolving the request
+        /// removes the reference, and the bytes go with it if nothing else holds
+        /// them.
+        /// </summary>
+        Printout = 9,
     }
 
     public enum EvaluationJobState
@@ -98,6 +105,23 @@ namespace AlgoJudge.Server.Database.Models
     {
         Question = 0,
         Announcement = 1,
+    }
+
+    /// <summary>
+    /// Where a print request has got to.
+    /// <para>
+    /// Three, and one transition. A printout is not an evaluation job: nothing
+    /// claims it, nothing leases it, and no Runner ever meets it — so
+    /// <see cref="EvaluationJobState"/>'s <c>Running</c> and <c>Superseded</c>
+    /// have no referent here. <c>Discarded</c> exists so the queue has an exit
+    /// that is not a printer.
+    /// </para>
+    /// </summary>
+    public enum PrintoutState
+    {
+        Requested = 0,
+        Printed = 1,
+        Discarded = 2,
     }
 
     /// <summary>

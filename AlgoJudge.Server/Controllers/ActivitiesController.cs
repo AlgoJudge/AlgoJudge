@@ -27,6 +27,7 @@ namespace AlgoJudge.Server.Controllers
         ISubmissionService submissions,
         IResultsService results,
         IQuestionService questions,
+        IPrintoutService printouts,
         IFileService files,
         IActivityGroupService groups
     ) : ControllerBase
@@ -142,6 +143,88 @@ namespace AlgoJudge.Server.Controllers
         {
             var asked = await questions.AskAsync(idOrSlug, input, ct);
             return Created($"/api/v1/activities/{idOrSlug}/questions/{asked.Id}", asked);
+        }
+
+        /// <summary>
+        /// The caller's own print requests in this activity, newest first.
+        /// </summary>
+        [HttpGet("{idOrSlug}/printouts")]
+        [ProducesResponseType<PageDto<PrintoutDto>>(StatusCodes.Status200OK)]
+        public Task<PageDto<PrintoutDto>> Printouts(
+            string idOrSlug,
+            [FromQuery] int page,
+            [FromQuery] int pageSize,
+            CancellationToken ct) =>
+            printouts.ListMineAsync(idOrSlug, new PageQuery { Page = page, PageSize = pageSize }, ct);
+
+        /// <summary>
+        /// Ask for a page of source on paper.
+        /// <para>
+        /// Multipart and not JSON, so the bytes are staged off the socket and
+        /// checksummed the way every other upload is — the same
+        /// <c>StageAsync</c> → <c>CommitAsync</c> path, and the same 422 when the
+        /// declared digest does not match what arrived.
+        /// </para>
+        /// <para>
+        /// <c>submissionId</c> is provenance only, and the service checks it is
+        /// the caller's own. The bytes are always the printout's: the source view
+        /// is tabbed and a submission may be an archive, so "print the
+        /// submission" does not name one page of text.
+        /// </para>
+        /// </summary>
+        [HttpPost("{idOrSlug}/printouts")]
+        [ProducesResponseType<PrintoutDto>(StatusCodes.Status201Created)]
+        [ProducesResponseType<ProblemDto>(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType<ProblemDto>(StatusCodes.Status413PayloadTooLarge)]
+        [ProducesResponseType<ProblemDto>(StatusCodes.Status422UnprocessableEntity)]
+        [Consumes("multipart/form-data")]
+        [Api.MultipartForm(Fields = ["code", "fileName", "sha256", "title", "submissionId"])]
+        [RequestSizeLimit(UploadLimits.Printout)]
+        [DisableFormValueModelBinding]
+        public async Task<ActionResult<PrintoutDto>> RequestPrintout(
+            string idOrSlug, CancellationToken ct)
+        {
+            var upload = await MultipartUpload.ReadAsync(
+                Request, UploadLimits.Printout,
+                (content, _, _, token) => files.StageAsync(content, token), ct);
+
+            var code = upload.Fields.TryGetValue("code", out var pasted) ? pasted : null;
+            if (code is null) throw new ValidationException("Send some source", "printout.empty");
+
+            var name = upload.Fields.TryGetValue("fileName", out var named) && named is { Length: > 0 }
+                ? named
+                : throw new ValidationException("A file name is required", "printout.fileName.required");
+
+            Guid? submissionId = null;
+            if (upload.Fields.TryGetValue("submissionId", out var raw) && raw is { Length: > 0 })
+            {
+                if (!Guid.TryParse(raw, out var parsed))
+                {
+                    throw new ValidationException("That is not a submission", "printout.submission.invalid");
+                }
+                submissionId = parsed;
+            }
+
+            var staged = await files.StageAsync(
+                new MemoryStream(System.Text.Encoding.UTF8.GetBytes(code)), ct);
+
+            try
+            {
+                var made = await printouts.RequestAsync(
+                    idOrSlug, staged, name, upload.Field("sha256"),
+                    upload.Fields.TryGetValue("title", out var title) ? title : null,
+                    submissionId, ct);
+
+                return Created($"/api/v1/activities/{idOrSlug}/printouts/{made.Id}", made);
+            }
+            catch
+            {
+                // Every refusal is above `CommitAsync`, so the bytes are down and
+                // the rules unasked. The collector is a day too late to be the
+                // answer here, exactly as it is for a submission.
+                await files.DiscardAsync(staged, ct);
+                throw;
+            }
         }
 
         [HttpPost("{idOrSlug}/questions/{questionId:guid}/read")]

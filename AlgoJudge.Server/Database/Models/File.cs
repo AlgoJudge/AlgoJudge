@@ -218,5 +218,8 @@ namespace AlgoJudge.Server.Database.Models
         /// <summary>Set for an instance document or the instance logo — the singleton row.</summary>
         public Guid? InstanceId { get; set; }
         public Instance? Instance { get; set; }
+
+        public Guid? PrintoutId { get; set; }
+        public Printout? Printout { get; set; }
     }
 }

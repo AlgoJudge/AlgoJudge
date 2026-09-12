@@ -41,6 +41,7 @@ public static class CopiedFields
         [
             nameof(Activity.Name), nameof(Activity.Type), nameof(Activity.RankingType),
             nameof(Activity.TimeZone), nameof(Activity.HasQuestions),
+            nameof(Activity.HasPrintouts),
             nameof(Activity.ScoreVisibility), nameof(Activity.ShowGroupMembers),
             nameof(Activity.JoinPolicy), nameof(Activity.Unlisted),
             nameof(Activity.HideEndedSeriesProblems), nameof(Activity.Props),
@@ -88,7 +89,8 @@ public static class CopiedFields
             nameof(Activity.JoinPassword),
             nameof(Activity.PublishedAt), nameof(Activity.ArchivedAt),
             // Nobody's work, nobody's rights, nobody's teams.
-            nameof(Activity.Questions), nameof(Activity.Grants), nameof(Activity.Groups),
+            nameof(Activity.Questions), nameof(Activity.Printouts),
+            nameof(Activity.Grants), nameof(Activity.Groups),
         ],
         [typeof(Series)] =
         [

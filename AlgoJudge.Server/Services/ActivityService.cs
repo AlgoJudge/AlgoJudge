@@ -432,6 +432,7 @@ namespace AlgoJudge.Server.Services
                 StartDate = shift(source.StartDate),
                 EndDate = shift(source.EndDate),
                 HasQuestions = source.HasQuestions,
+                HasPrintouts = source.HasPrintouts,
                 ShowGroupMembers = source.ShowGroupMembers,
                 // The pool the copy is judged on. A copy that fell back to the
                 // general Runners would be sent to machines the original was
@@ -652,6 +653,7 @@ namespace AlgoJudge.Server.Services
                 StartDate = ParseInstant(input.StartDate),
                 EndDate = ParseInstant(input.EndDate),
                 HasQuestions = input.Modules?.Questions ?? true,
+                HasPrintouts = input.Modules?.Printouts ?? false,
                 ScoreVisibility = ParseScoreVisibility(input.ScoreVisibility),
                 JoinPolicy = policy,
                 // Only kept under `password`, so switching to open and back does

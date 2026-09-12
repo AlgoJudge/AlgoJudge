@@ -20,6 +20,7 @@ namespace AlgoJudge.Server.Api.Contracts
     public record ActivityModulesDto
     {
         public required bool Questions { get; init; }
+        public required bool Printouts { get; init; }
     }
 
 
@@ -480,5 +481,22 @@ namespace AlgoJudge.Server.Api.Contracts
         public required IReadOnlyList<EvaluationAttemptDto> Attempts { get; init; }
         /// <summary>What was sent. On the submission, because every rejudge reads the same bytes.</summary>
         public required IReadOnlyList<SubmissionFileDto> Files { get; init; }
+    }
+
+    /// <summary>
+    /// One print request, as the person who made it sees it. No source: the
+    /// requester sent it and the operator prints it, and a second copy on this
+    /// wire would be a second place it has to be disposed of.
+    /// </summary>
+    public record PrintoutDto
+    {
+        public required string Id { get; init; }
+        public string? Title { get; init; }
+        public required string FileName { get; init; }
+        public required long SizeBytes { get; init; }
+        /// <summary>`requested` | `printed` | `discarded`.</summary>
+        public required string State { get; init; }
+        public required string RequestedAt { get; init; }
+        public string? ResolvedAt { get; init; }
     }
 }

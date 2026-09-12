@@ -12,6 +12,7 @@
     "maintenanceChanged",
     "managerSeriesChanged",
     "permissionTemplateChanged",
+    "printoutChanged",
     "problemChanged",
     "problemStatusChanged",
     "questionAnswered",

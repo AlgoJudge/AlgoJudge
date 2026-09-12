@@ -190,6 +190,77 @@ namespace AlgoJudge.Server.Controllers
             users.SessionsAsync(userId, ct);
     }
 
+    /// <summary>
+    /// The queue somebody at a printer works from.
+    /// <para>
+    /// <b>The one surface a person can be given on its own.</b> Everything here
+    /// asks <c>printout:manage</c> and nothing else, so a grant carrying that key
+    /// and no other opens this screen and refuses the rest of the panel — which
+    /// is the whole point of the permission existing.
+    /// </para>
+    /// </summary>
+    [ApiController]
+    [Route("printouts")]
+    [Authorize]
+    public class PrintoutsController(IPrintoutService printouts) : ControllerBase
+    {
+        /// <summary>Oldest first: a queue is worked from the front.</summary>
+        [HttpGet]
+        [ProducesResponseType<PageDto<ManagedPrintoutDto>>(StatusCodes.Status200OK)]
+        public Task<PageDto<ManagedPrintoutDto>> List(
+            [FromQuery] int page, [FromQuery] int pageSize,
+            [FromQuery] Guid? activityId, [FromQuery] string? state,
+            CancellationToken ct) =>
+            printouts.ListAsync(
+                new PageQuery { Page = page, PageSize = pageSize }, activityId, state, ct);
+
+        /// <summary>
+        /// What the activity filter offers.
+        /// <para>
+        /// Its own endpoint rather than the panel's activity summary, which asks
+        /// <c>activity:update</c> — an operator would be handed an empty list
+        /// with no error to notice.
+        /// </para>
+        /// </summary>
+        [HttpGet("activities")]
+        [ProducesResponseType<IReadOnlyList<PrintoutActivityDto>>(StatusCodes.Status200OK)]
+        public Task<IReadOnlyList<PrintoutActivityDto>> Activities(CancellationToken ct) =>
+            printouts.ActivitiesAsync(ct);
+
+        /// <summary>
+        /// Everything one sheet carries, source included.
+        /// <para>
+        /// <c>no-store</c> by hand. <c>/files/{id}</c> answers
+        /// <c>max-age=31536000, immutable</c>, which is right for immutable bytes
+        /// and wrong for somebody's exam answer: a browser that fetched it there
+        /// would keep it for a year whatever the Server later deletes.
+        /// </para>
+        /// <para>
+        /// Once resolved this answers 200 with no source rather than 404. The
+        /// printout still exists and its row is the audit trail.
+        /// </para>
+        /// </summary>
+        [HttpGet("{id:guid}")]
+        [ProducesResponseType<PrintoutSheetDto>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ProblemDto>(StatusCodes.Status403Forbidden)]
+        public async Task<PrintoutSheetDto> Sheet(Guid id, CancellationToken ct)
+        {
+            Response.Headers.CacheControl = "no-store";
+            return await printouts.SheetAsync(id, ct);
+        }
+
+        /// <summary>
+        /// It printed, or it did not. Either way the source goes.
+        /// </summary>
+        [HttpPost("{id:guid}/resolve")]
+        [ProducesResponseType<ManagedPrintoutDto>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ProblemDto>(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType<ProblemDto>(StatusCodes.Status409Conflict)]
+        public Task<ManagedPrintoutDto> Resolve(
+            Guid id, [FromBody] ResolvePrintoutInputDto input, CancellationToken ct) =>
+            printouts.ResolveAsync(id, input, ct);
+    }
+
     [ApiController]
     [Route("questions")]
     [Authorize]

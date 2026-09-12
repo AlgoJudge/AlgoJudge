@@ -839,4 +839,67 @@ namespace AlgoJudge.Server.Api.Contracts
         /// <summary>Whether an undo is still offered.</summary>
         public required bool CanUndo { get; init; }
     }
+
+    // ── Printouts ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// One row of the queue an operator works from. Metadata only: the source
+    /// travels on <see cref="PrintoutSheetDto"/>, which is one request per sheet
+    /// and carries a header saying not to store it.
+    /// </summary>
+    public record ManagedPrintoutDto
+    {
+        public required string Id { get; init; }
+        public required string ActivityId { get; init; }
+        public required string ActivityName { get; init; }
+        public required string RequestedByName { get; init; }
+        /// <summary>The group as it was when the request was made, if any.</summary>
+        public string? GroupName { get; init; }
+        public string? Title { get; init; }
+        public required string FileName { get; init; }
+        public required long SizeBytes { get; init; }
+        /// <summary>Printed in the sheet's footer, so paper matches a row.</summary>
+        public required string Sha256 { get; init; }
+        /// <summary>`requested` | `printed` | `discarded`.</summary>
+        public required string State { get; init; }
+        public required string RequestedAt { get; init; }
+        public string? ResolvedAt { get; init; }
+        public string? ResolvedByName { get; init; }
+        /// <summary>Set once the source has gone. The row outlives the bytes.</summary>
+        public string? SourceDisposedAt { get; init; }
+    }
+
+    /// <summary>
+    /// Everything one sheet of paper carries, source included.
+    /// <para>
+    /// <see cref="Source"/> is null once the request is resolved, and the
+    /// endpoint still answers 200: the printout exists and its record is the
+    /// audit trail, so a 404 would be a different and false sentence.
+    /// </para>
+    /// </summary>
+    public record PrintoutSheetDto
+    {
+        public required ManagedPrintoutDto Printout { get; init; }
+        /// <summary>The activity's own zone, so a date on paper reads as the room did.</summary>
+        public required string TimeZone { get; init; }
+        /// <summary>Where the text came from, when it came from a submission.</summary>
+        public string? ProblemSlug { get; init; }
+        public string? ProblemName { get; init; }
+        public string? Source { get; init; }
+    }
+
+    /// <summary>What the operator did with the paper.</summary>
+    public record ResolvePrintoutInputDto
+    {
+        /// <summary>`printed` | `discarded`.</summary>
+        public string? Outcome { get; init; }
+    }
+
+    /// <summary>One activity the caller may work the queue of.</summary>
+    public record PrintoutActivityDto
+    {
+        public required string Id { get; init; }
+        public required string Name { get; init; }
+        public required string Slug { get; init; }
+    }
 }
