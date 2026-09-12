@@ -130,6 +130,18 @@ namespace AlgoJudge.Server.Authorization
         public const string QuestionPublish = "question:publish";
         public const string AnnouncementCreate = "announcement:create";
 
+        /// <summary>
+        /// Asking for a page of source on paper, and working the queue of those
+        /// asks.
+        /// <para>
+        /// Two keys rather than one, because the point of the second is that it
+        /// can be handed to somebody who holds nothing else — the person at the
+        /// printer is not thereby a manager of anything.
+        /// </para>
+        /// </summary>
+        public const string PrintoutRequest = "printout:request";
+        public const string PrintoutManage = "printout:manage";
+
         public const string RankingRead = "ranking:read";
         public const string RankingReadUnfrozen = "ranking:read:unfrozen";
         public const string RankingUnfreeze = "ranking:unfreeze";
@@ -177,7 +189,7 @@ namespace AlgoJudge.Server.Authorization
         public const string ProviderManage = "provider:manage";
 
         /// <summary>
-        /// The seven an ordinary participant holds.
+        /// The eight an ordinary participant holds.
         /// <para>
         /// This list is load-bearing beyond the grant editor: it is what
         /// <see cref="IsStaff"/> measures against, and therefore what decides who
@@ -193,6 +205,7 @@ namespace AlgoJudge.Server.Authorization
             QuestionReadOwn,
             QuestionCreate,
             RankingRead,
+            PrintoutRequest,
         ];
 
         /// <summary>
@@ -262,6 +275,9 @@ namespace AlgoJudge.Server.Authorization
             Define(QuestionAnswer, "question", PermissionScope.Activity),
             Define(QuestionPublish, "question", PermissionScope.Activity),
             Define(AnnouncementCreate, "question", PermissionScope.Activity),
+
+            Define(PrintoutRequest, "printout", PermissionScope.Activity),
+            Define(PrintoutManage, "printout", PermissionScope.Both),
 
             Define(RankingRead, "ranking", PermissionScope.Activity),
             Define(RankingReadUnfrozen, "ranking", PermissionScope.Both),
@@ -352,6 +368,7 @@ namespace AlgoJudge.Server.Authorization
             ResultReadAll, ResultLogReadAll,
             QuestionReadAll, QuestionAnswer, QuestionPublish,
             AnnouncementCreate,
+            PrintoutManage,
             RankingReadUnfrozen, RankingUnfreeze,
             UserCreateTemporary,
             GrantReadAll, GrantUpdate,

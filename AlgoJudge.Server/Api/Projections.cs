@@ -255,7 +255,7 @@ namespace AlgoJudge.Server.Api
             EndDate = Contracts.Wire.At(activity.EndDate),
             HideEndedSeriesProblems = activity.HideEndedSeriesProblems,
             Documents = documents.Select(ActivityDocument).ToList(),
-            Modules = new ActivityModulesDto { Questions = activity.HasQuestions },
+            Modules = new ActivityModulesDto { Questions = activity.HasQuestions, Printouts = activity.HasPrintouts },
             // Deliberately absent from the participant's model: the join
             // password, the attachment table, every ceiling, and the counts.
             Props = Opaque(activity.Props),
@@ -277,7 +277,7 @@ namespace AlgoJudge.Server.Api
                 TimeZone = activity.TimeZone,
                 StartDate = Contracts.Wire.At(activity.StartDate),
                 EndDate = Contracts.Wire.At(activity.EndDate),
-                Modules = new ActivityModulesDto { Questions = activity.HasQuestions },
+                Modules = new ActivityModulesDto { Questions = activity.HasQuestions, Printouts = activity.HasPrintouts },
                 Documents = documents.Select(ActivityDocument).ToList(),
                 ScoreVisibility = Wire(activity.ScoreVisibility),
                 AttachmentVisibility = activity.AttachmentRules

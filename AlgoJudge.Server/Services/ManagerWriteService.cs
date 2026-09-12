@@ -152,7 +152,11 @@ namespace AlgoJudge.Server.Services
             activity.TimeZone = input.TimeZone ?? activity.TimeZone;
             activity.StartDate = ActivityService.ParseInstant(input.StartDate);
             activity.EndDate = ActivityService.ParseInstant(input.EndDate);
-            if (input.Modules is { } modules) activity.HasQuestions = modules.Questions;
+            if (input.Modules is { } modules)
+            {
+                activity.HasQuestions = modules.Questions;
+                activity.HasPrintouts = modules.Printouts;
+            }
             if (input.ScoreVisibility is { } visibility) activity.ScoreVisibility = ParseScoreVisibility(visibility);
             if (input.HideEndedSeriesProblems is { } hide) activity.HideEndedSeriesProblems = hide;
             if (input.ShowGroupMembers is { } roster) activity.ShowGroupMembers = roster;

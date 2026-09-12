@@ -20,6 +20,7 @@ namespace AlgoJudge.Server.Api.Contracts
     public record ActivityModulesDto
     {
         public required bool Questions { get; init; }
+        public required bool Printouts { get; init; }
     }
 
 

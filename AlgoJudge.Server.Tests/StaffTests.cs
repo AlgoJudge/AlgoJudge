@@ -90,6 +90,31 @@ public class StaffTests
     }
 
     /// <summary>
+    /// Asking for a page on paper does not make somebody staff; working the
+    /// queue does.
+    /// <para>
+    /// The asymmetry is the design. `printout:request` is in
+    /// <c>ParticipantKeys</c>, so it is non-staff-conferring by construction —
+    /// the `trial:run` lesson applied rather than remembered. `printout:manage`
+    /// is deliberately outside, because reading what other people wrote is the
+    /// definition of staff, and it is pinned here so that adding it to
+    /// <c>NotStaffConferring</c> to be helpful fails loudly. The consequence a
+    /// manager has to be told: a volunteer handed the printer in an activity
+    /// they also compete in leaves that activity's board.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void Asking_for_paper_is_not_staff_but_handing_it_out_is()
+    {
+        Assert.Contains(Permissions.PrintoutRequest, Permissions.Participant);
+        Assert.False(Permissions.IsStaff(Permissions.Participant));
+
+        Assert.True(
+            Permissions.IsStaff([Permissions.PrintoutManage]),
+            "the queue carries other people's source, which is what staff means here");
+    }
+
+    /// <summary>
     /// And the two flags are genuinely two: `trial:run` is the key that told
     /// them apart, so it is the one worth naming.
     /// </summary>
