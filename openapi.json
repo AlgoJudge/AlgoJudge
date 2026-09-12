@@ -14628,6 +14628,7 @@
         "required": [
           "activityId",
           "activityName",
+          "activitySlug",
           "fileName",
           "id",
           "requestedAt",
@@ -14647,6 +14648,10 @@
             "nullable": true
           },
           "activityName": {
+            "type": "string",
+            "nullable": true
+          },
+          "activitySlug": {
             "type": "string",
             "nullable": true
           },

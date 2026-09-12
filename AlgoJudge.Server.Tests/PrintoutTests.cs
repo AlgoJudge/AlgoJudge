@@ -381,6 +381,7 @@ public class PrintoutTests(ServerFixture server)
 
         var sheet = await Build.GetAsync(printer, $"/api/v1/printouts/{printoutId}");
         Assert.Equal("print('paper')\n", sheet.GetProperty("source").GetString());
+        Assert.Equal(slug, sheet.GetProperty("printout").GetProperty("activitySlug").GetString());
         Assert.False(string.IsNullOrWhiteSpace(
             sheet.GetProperty("printout").GetProperty("requestedByName").GetString()));
         Assert.Equal(

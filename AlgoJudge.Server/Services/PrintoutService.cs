@@ -472,6 +472,7 @@ namespace AlgoJudge.Server.Services
             Id = x.Id.ToString(),
             ActivityId = x.ActivityId.ToString(),
             ActivityName = x.Activity?.Name ?? "",
+            ActivitySlug = x.Activity?.Slug ?? "",
             RequestedByName = x.RequestedBy is null
                 ? x.RequestedByUserId
                 : Projections.DisplayName(x.RequestedBy),
