@@ -394,6 +394,12 @@ namespace AlgoJudge.Server.Database
                 ScoreVisibility = scoreVisibility,
                 JoinPolicy = joinPolicy,
                 JoinPassword = joinPassword,
+                // **Published, as creating one through the API publishes it.**
+                // The seed wrote rows directly and left this null, so every
+                // activity in the demo world was one nobody had published — a
+                // state `GetAsync` answers 404 for. It worked only because
+                // enrolling did not ask, which stopped being true on 2026-09-09.
+                PublishedAt = now,
                 Unlisted = true,
                 HideEndedSeriesProblems = false,
                 MaxUploadBytes = maxUploadBytes,

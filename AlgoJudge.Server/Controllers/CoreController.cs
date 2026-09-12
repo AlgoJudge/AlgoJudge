@@ -14,6 +14,13 @@ namespace AlgoJudge.Server.Controllers
     /// </summary>
     [ApiController]
     [Route("instance")]
+    // **Public by declaration, not by omission.** Nothing here carried an
+    // attribute, and it was reachable only because no fallback policy is
+    // registered — so a fallback added later would close it silently, and a
+    // controller written without `[Authorize]` is public today by accident
+    // rather than by decision. What it serves is meant to be public: the
+    // sign-in screen has to draw itself before anybody is signed in.
+    [AllowAnonymous]
     public class InstanceController(IInstanceService instances) : ControllerBase
     {
         [HttpGet]

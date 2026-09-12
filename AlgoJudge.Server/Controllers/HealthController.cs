@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using AlgoJudge.Server.Api.Contracts;
 using AlgoJudge.Server.Database.Models;
 using AlgoJudge.Server.Services;
@@ -24,6 +25,9 @@ namespace AlgoJudge.Server.Controllers
     /// </summary>
     [ApiController]
     [Route("health")]
+    // Public by declaration rather than by omission, for the reason
+    // `InstanceController` gives: a probe that needs a session is not a probe.
+    [AllowAnonymous]
     public class HealthController(
         IMaintenanceService maintenance,
         Storage.IStorageHealth storage

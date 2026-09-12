@@ -87,8 +87,13 @@ namespace AlgoJudge.Server.Services
             // The checksum is the one the store computed while writing, so this
             // is the same commit an upload makes — there is no second path for
             // bytes that arrived this way.
+            // **The caller, not nobody.** A fetch is made by a signed-in manager
+            // holding `problem:import:external`, and an unreferenced file is
+            // readable only by whoever uploaded it — so stamping nobody produced
+            // a file its own fetcher could not read back and the collector
+            // removed a day later. Corrected 2026-09-09.
             return await files.CommitAsync(
-                staged, NameOf(decision.Target!), MediaTypeOf(response), staged.Key.Sha256, Uploader.Nobody, ct);
+                staged, NameOf(decision.Target!), MediaTypeOf(response), staged.Key.Sha256, Uploader.Session, ct);
         }
 
         /// <summary>

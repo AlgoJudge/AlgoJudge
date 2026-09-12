@@ -49,6 +49,14 @@ namespace AlgoJudge.Server.Services
         Task<ManagedActivityDto> CreateAsync(ActivityInputDto input, CancellationToken ct);
         Task<ActivityDto> EnrolAsync(string idOrSlug, EnrolInputDto input, CancellationToken ct);
         Task<Activity> ResolveAsync(string idOrSlug, CancellationToken ct);
+
+        /// <summary>
+        /// Refuses with <b>404</b> unless this activity may be seen at all —
+        /// published, and either listed or joined. Asked by the activity's page
+        /// and by every sub-resource beside it, so the refusal does not say which
+        /// slugs exist.
+        /// </summary>
+        Task RequireVisibleAsync(Activity activity, CancellationToken ct);
     }
 
     public class ActivityService(
@@ -196,29 +204,49 @@ namespace AlgoJudge.Server.Services
         /// activity's own page needs to draw itself for them. Not the series, and
         /// not the problems — those belong to being in it.
         /// </summary>
-        public async Task<ActivityDto> GetAsync(string idOrSlug, CancellationToken ct)
+        /// <summary>
+        /// Whether this activity may be seen at all, and <b>404</b> when it may
+        /// not.
+        /// <para>
+        /// Two refusals, both deliberately not 403. An activity being prepared
+        /// is invisible even to its members — a copy carries none, but a rebound
+        /// placement could, and the only people who see one being prepared are
+        /// the people preparing it. And an activity that is neither listed nor
+        /// joined must not be confirmed to exist by the shape of the refusal,
+        /// because the address is guessable.
+        /// </para>
+        /// <para>
+        /// <b>Here rather than in `GetAsync` alone since 2026-09-09.</b> The
+        /// activity's own page answered 404 and every sub-resource beside it —
+        /// results, rounds, questions — answered 403 after resolving the same
+        /// row, so the refusal itself said which slugs exist. One rule, asked by
+        /// all of them.
+        /// </para>
+        /// </summary>
+        public async Task RequireVisibleAsync(Activity activity, CancellationToken ct)
         {
-            var activity = await ResolveAsync(idOrSlug, ct);
-            var memberships = await MembershipsAsync(ct);
-
-            var member = memberships.ContainsKey(activity.Id);
-            var listed = !activity.Unlisted && activity.JoinPolicy != JoinPolicy.Closed;
-
-            // **Being in it does not make an unpublished activity readable.** A
-            // copy carries no members, but a rebound placement could; the only
-            // people who see one being prepared are the people preparing it.
             if (activity.PublishedAt is null
                 && !await permissions.HasAsync(Permissions.ActivityUpdate, activity.Id, ct))
             {
                 throw new NotFoundException("Activity");
             }
 
-            // Not 403: an activity somebody may not see must not be confirmed to
-            // exist by the shape of the refusal. The address is guessable.
-            if (!member && !listed && !await permissions.HasAsync(Permissions.ActivityUpdate, activity.Id, ct))
+            var memberships = await MembershipsAsync(ct);
+            var listed = !activity.Unlisted && activity.JoinPolicy != JoinPolicy.Closed;
+
+            if (!memberships.ContainsKey(activity.Id) && !listed
+                && !await permissions.HasAsync(Permissions.ActivityUpdate, activity.Id, ct))
             {
                 throw new NotFoundException("Activity");
             }
+        }
+
+        public async Task<ActivityDto> GetAsync(string idOrSlug, CancellationToken ct)
+        {
+            var activity = await ResolveAsync(idOrSlug, ct);
+            await RequireVisibleAsync(activity, ct);
+
+            var memberships = await MembershipsAsync(ct);
 
             return Projections.Activity(
                 activity,
@@ -708,6 +736,20 @@ namespace AlgoJudge.Server.Services
                 existing.State = GrantState.Active;
                 await context.SaveChangesAsync(ct);
                 return await ProjectAsync(activity, ct);
+            }
+
+            // **An activity being prepared takes nobody.** `GetAsync` answers
+            // 404 for an unpublished one, because the address is guessable and
+            // the only people who see one being prepared are the people
+            // preparing it. Enrolling checked the archive and the join policy and
+            // not this until 2026-09-09 — and then returned the projection it had
+            // just granted access to. `DuplicateAsync` produces exactly the
+            // vulnerable shape: unpublished, with the original's join policy
+            // copied.
+            if (activity.PublishedAt is null
+                && !await permissions.HasAsync(Permissions.ActivityUpdate, activity.Id, ct))
+            {
+                throw new NotFoundException("Activity");
             }
 
             switch (activity.JoinPolicy)

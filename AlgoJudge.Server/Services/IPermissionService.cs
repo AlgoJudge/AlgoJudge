@@ -47,10 +47,48 @@ namespace AlgoJudge.Server.Services
         /// </summary>
         Task<IReadOnlySet<string>> AnywhereAsync(CancellationToken ct = default);
 
+        /// <summary>Whether the caller holds it anywhere.</summary>
+        Task<bool> HasAnywhereAsync(string permission, CancellationToken ct = default);
+
+        /// <summary>
+        /// Throws unless the caller holds it anywhere.
+        /// <para>
+        /// For the surfaces that are the installation's rather than an
+        /// activity's and are still a manager's work — the problem library.
+        /// Managing one activity is what admits somebody to it; asking at system
+        /// scope refused every manager whose grant is on an activity, which is
+        /// every manager an activity's grant editor makes.
+        /// </para>
+        /// </summary>
+        Task RequireAnywhereAsync(string permission, CancellationToken ct = default);
+
         /// <summary>
         /// The activities the caller holds this permission in. Null means every
         /// activity, which is what a system grant answers.
         /// </summary>
         Task<IReadOnlyCollection<Guid>?> ActivitiesWithAsync(string permission, CancellationToken ct = default);
+
+        /// <summary>
+        /// What a panel list may draw from, and the refusal when that is nothing.
+        /// <para>
+        /// <b>An activity named in the query is a question at that scope</b>, and
+        /// is required there. <b>No activity is a different question</b> —
+        /// "everything I may read" — whose answer is a narrowing rather than a
+        /// refusal: null for somebody restricted to nothing, otherwise the
+        /// activities they hold it in.
+        /// </para>
+        /// <para>
+        /// Holding it <b>nowhere</b> stays a refusal. An empty page would tell
+        /// somebody who may not look that there is nothing to see, which is a
+        /// different sentence and the wrong one.
+        /// </para>
+        /// <para>
+        /// Here rather than in each list, because three of them need the same
+        /// rule and a security rule written three times is a security rule that
+        /// drifts twice.
+        /// </para>
+        /// </summary>
+        Task<IReadOnlyCollection<Guid>?> ListScopeAsync(
+            string permission, Guid? activityId, CancellationToken ct = default);
     }
 }

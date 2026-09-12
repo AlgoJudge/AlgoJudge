@@ -181,6 +181,28 @@ namespace AlgoJudge.Server.Services
             }
         }
 
+        public async Task<bool> HasAnywhereAsync(string permission, CancellationToken ct = default) =>
+            (await AnywhereAsync(ct)).Contains(permission);
+
+        public async Task RequireAnywhereAsync(string permission, CancellationToken ct = default)
+        {
+            if (!await HasAnywhereAsync(permission, ct)) throw new AccessDeniedException(permission);
+        }
+
+        public async Task<IReadOnlyCollection<Guid>?> ListScopeAsync(
+            string permission, Guid? activityId, CancellationToken ct = default)
+        {
+            if (activityId is { } named)
+            {
+                await RequireAsync(permission, named, ct);
+                return null;
+            }
+
+            var allowed = await ActivitiesWithAsync(permission, ct);
+            if (allowed is { Count: 0 }) throw new AccessDeniedException(permission);
+            return allowed;
+        }
+
         public async Task<IReadOnlyCollection<Guid>?> ActivitiesWithAsync(string permission, CancellationToken ct = default)
         {
             var all = await GrantsAsync(ct);

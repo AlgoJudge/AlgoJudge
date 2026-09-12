@@ -59,7 +59,7 @@ namespace AlgoJudge.Server.Services
         /// <summary>An approved Runner, which carries a token and not a session.</summary>
         public static Uploader Runner(Guid runnerId) => new() { RunnerId = runnerId };
 
-        /// <summary>A seed, a preconfiguration, a fetch — no principal at all.</summary>
+        /// <summary>A seed or a preconfiguration: no principal at all.</summary>
         public static Uploader Nobody => new();
     }
 
@@ -167,6 +167,7 @@ namespace AlgoJudge.Server.Services
         ICurrentUserService currentUser,
         IPermissionService permissions,
         ISeriesLockdown lockdown,
+        ISeriesGate gate,
         IBlobStoreRegistry stores
     ) : IFileService
     {
@@ -434,9 +435,14 @@ namespace AlgoJudge.Server.Services
 
             // Manager scope is where a model solution lives. Never a participant,
             // never a Runner reading it as a participant would.
+            //
+            // **Anywhere, not at system scope.** The library these files belong
+            // to admits whoever manages an activity, so a manager who may open a
+            // problem must be able to read its bytes; asking at system scope let
+            // them open the screen and not the file.
             if (reference.Scope == FileScope.Manager)
             {
-                return await permissions.HasAsync(Authorization.Permissions.ProblemUpdate, null, ct);
+                return await permissions.HasAnywhereAsync(Authorization.Permissions.ProblemUpdate, ct);
             }
 
             // Runner scope: the package. Readable by a Runner holding a job for
@@ -444,7 +450,7 @@ namespace AlgoJudge.Server.Services
             // a Runner — and by managers.
             if (reference.Scope == FileScope.Runner)
             {
-                return await permissions.HasAsync(Authorization.Permissions.ProblemUpdate, null, ct);
+                return await permissions.HasAnywhereAsync(Authorization.Permissions.ProblemUpdate, ct);
             }
 
             // Participant scope: readable from **any assignment of this version
@@ -465,9 +471,15 @@ namespace AlgoJudge.Server.Services
             var holders = await context.SeriesProblems.AsNoTracking()
                 .Where(sp => sp.PinnedProblemVersionId == versionId
                     || context.ProblemVersions.Any(v => v.Id == versionId && v.ProblemId == sp.ProblemId))
-                .Select(sp => new { sp.ActivityId, sp.SeriesId, sp.Series!.Importance })
-                .Distinct()
+                .Select(sp => new { sp.ActivityId, sp.SeriesId, Series = sp.Series!, Activity = sp.Activity! })
                 .ToListAsync(ct);
+
+            // One problem hangs in several places and each place is judged on its
+            // own; the same place twice is the same answer, so it is asked once.
+            holders = holders
+                .GroupBy(h => new { h.ActivityId, h.SeriesId })
+                .Select(g => g.First())
+                .ToList();
 
             var state = await lockdown.ForReaderAsync(ct);
 
@@ -475,10 +487,20 @@ namespace AlgoJudge.Server.Services
             {
                 if (!state.Quiet
                     && (state.IsHidden(holder.SeriesId)
-                        || state.IsLocked(holder.ActivityId, holder.Importance)))
+                        || state.IsLocked(holder.ActivityId, holder.Series.Importance)))
                 {
                     continue;
                 }
+
+                // **The round's own gate, which this asked nothing about until
+                // 2026-09-09.** `ProblemService` treats `MayReadProblems` as the
+                // rule for whether a statement may be sent at all — a round that
+                // never opened does not disclose what it holds, a paused one may
+                // hide it, an ended one may. Applying the lockdown and not this
+                // meant every one of those was readable **by file id**, which is
+                // the one address the screens do not control.
+                if (!gate.MayReadProblems(holder.Series, holder.Activity)) continue;
+
                 if (await permissions.HasAsync(
                     Authorization.Permissions.ActivityRead, holder.ActivityId, ct)) return true;
             }
