@@ -111,7 +111,15 @@ namespace AlgoJudge.Server.Services
             PageQuery paging, Guid? activityId, Guid? seriesId, Guid? assignmentId,
             string? userId, string? state, string? verdict, string? search, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.SubmissionReadAll, activityId, ct);
+            // **Required only where the caller named an activity.** Without one
+            // the question is "everything I may read", and the answer to that is
+            // the narrowing below — the shape `ListManagedAsync` has always had.
+            // Requiring at the query's own scope answered 403 to every manager
+            // whose grant is on an activity, because a grant on an activity
+            // contributes nothing to a question asked with no activity in it.
+            // That is the panel's unfiltered list, so the screen was unreachable
+            // for exactly the people it is for.
+            var allowed = await permissions.ListScopeAsync(Permissions.SubmissionReadAll, activityId, ct);
 
             var query = context.Submissions
                 .AsNoTracking()
@@ -122,21 +130,16 @@ namespace AlgoJudge.Server.Services
                 .Include(s => s.Jobs).ThenInclude(j => j.Result)
                 .AsQueryable();
 
-            // Without an activity, the answer is narrowed to the activities the
-            // caller may read submissions in. `submission:read:all` is scoped,
-            // and a manager of one course must not see another's.
+            // Narrowed to the activities the caller may read submissions in: a
+            // manager of one course must not see another's.
             if (activityId is { } scoped)
             {
                 query = query.Where(s => s.SeriesProblem!.ActivityId == scoped);
             }
-            else
+            else if (allowed is not null)
             {
-                var allowed = await permissions.ActivitiesWithAsync(Permissions.SubmissionReadAll, ct);
-                if (allowed is not null)
-                {
-                    var ids = allowed.ToHashSet();
-                    query = query.Where(s => ids.Contains(s.SeriesProblem!.ActivityId));
-                }
+                var ids = allowed.ToHashSet();
+                query = query.Where(s => ids.Contains(s.SeriesProblem!.ActivityId));
             }
 
             if (seriesId is { } series) query = query.Where(s => s.SeriesProblem!.SeriesId == series);
@@ -552,7 +555,9 @@ namespace AlgoJudge.Server.Services
             PageQuery paging, Guid? activityId, Guid? seriesId, string? kind,
             bool unansweredOnly, string? search, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.QuestionReadAll, activityId, ct);
+            // Scoped the way the submissions list above is, and for the reason
+            // written there.
+            var allowed = await permissions.ListScopeAsync(Permissions.QuestionReadAll, activityId, ct);
 
             var query = context.Questions
                 .AsNoTracking()
@@ -566,14 +571,10 @@ namespace AlgoJudge.Server.Services
             {
                 query = query.Where(q => q.ActivityId == scoped);
             }
-            else
+            else if (allowed is not null)
             {
-                var allowed = await permissions.ActivitiesWithAsync(Permissions.QuestionReadAll, ct);
-                if (allowed is not null)
-                {
-                    var ids = allowed.ToHashSet();
-                    query = query.Where(q => ids.Contains(q.ActivityId));
-                }
+                var ids = allowed.ToHashSet();
+                query = query.Where(q => ids.Contains(q.ActivityId));
             }
 
             if (seriesId is { } series) query = query.Where(q => q.SeriesId == series);

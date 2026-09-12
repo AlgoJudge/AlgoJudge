@@ -71,7 +71,11 @@ namespace AlgoJudge.Server.Services
         public async Task<PageDto<GrantDto>> ListAsync(
             PageQuery paging, string? userId, Guid? activityId, string? scope, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.GrantReadAll, activityId, ct);
+            // Scoped as the panel's other lists are. **The narrowing had to be
+            // written here**: this list never had one, so a manager whose grant
+            // is on an activity was refused rather than shown the grants of the
+            // activity they manage.
+            var allowed = await permissions.ListScopeAsync(Permissions.GrantReadAll, activityId, ct);
 
             var query = context.Grants
                 .AsNoTracking()
@@ -80,6 +84,17 @@ namespace AlgoJudge.Server.Services
                 .Include(g => g.SourceProvider)
                 .Include(g => g.Group)
                 .AsQueryable();
+
+            // **A system grant is not an activity's business.** Somebody holding
+            // the key on activities alone reads those activities' grants and no
+            // others: the installation's own grants answer to it held at system
+            // scope, which is the difference between running a course and
+            // running the installation.
+            if (allowed is not null)
+            {
+                var ids = allowed.ToHashSet();
+                query = query.Where(g => g.ActivityId != null && ids.Contains(g.ActivityId.Value));
+            }
 
             if (userId is not null) query = query.Where(g => g.UserId == userId);
             if (activityId is { } id) query = query.Where(g => g.ActivityId == id);
@@ -309,9 +324,12 @@ namespace AlgoJudge.Server.Services
             // declares a scope for all 52, but five of the shipped `manager`
             // template's are `Global` — the `problem:*` ones — and the panel
             // applies that template to activity grants. Refusing every misplaced
-            // global key would refuse the template this product ships. That
-            // those five are equally inert there is a separate defect, pinned by
-            // `A_global_key_in_an_activity_grant_does_nothing`.
+            // global key would refuse the template this product ships.
+            //
+            // Those five are no longer inert there: since 2026-09-09 the problem
+            // library asks for them **anywhere** rather than at system scope, so
+            // an activity grant carries them. What the declaration means is
+            // therefore documentation, and only this key's scope is a rule.
             if (activityId is not null && wanted.Contains(Permissions.SystemAdministrator))
             {
                 throw new ValidationException(

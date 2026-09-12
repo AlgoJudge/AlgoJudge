@@ -37,9 +37,14 @@ namespace AlgoJudge.Server.Services
             Guid? seriesId, Guid? problemId, CancellationToken ct)
         {
             var activity = await activities.ResolveAsync(activityIdOrSlug, ct);
+            await activities.RequireVisibleAsync(activity, ct);
             await permissions.RequireAsync(Permissions.QuestionReadOwn, activity.Id, ct);
             await lockdown.RequireReachableAsync(activity.Id, ct);
             var user = await currentUser.RequireAsync(ct);
+            // Membership, which a permission does not answer: a participant's
+            // keys held at system scope reach every activity, and being in one
+            // is a different question. See `Membership`.
+            await Membership.RequireAsync(context, permissions, activity.Id, user.Id, ct);
 
             var readsAll = await permissions.HasAsync(Permissions.QuestionReadAll, activity.Id, ct);
 
@@ -140,8 +145,13 @@ namespace AlgoJudge.Server.Services
             string activityIdOrSlug, AskQuestionInputDto input, CancellationToken ct)
         {
             var activity = await activities.ResolveAsync(activityIdOrSlug, ct);
+            await activities.RequireVisibleAsync(activity, ct);
             await permissions.RequireAsync(Permissions.QuestionCreate, activity.Id, ct);
             var user = await currentUser.RequireAsync(ct);
+            // Membership, which a permission does not answer: a participant's
+            // keys held at system scope reach every activity, and being in one
+            // is a different question. See `Membership`.
+            await Membership.RequireAsync(context, permissions, activity.Id, user.Id, ct);
 
             if (activity.ArchivedAt is not null)
             {
@@ -229,9 +239,16 @@ namespace AlgoJudge.Server.Services
             await permissions.RequireAsync(Permissions.QuestionReadOwn, activity.Id, ct);
             var user = await currentUser.RequireAsync(ct);
 
-            var exists = await context.Questions
-                .AnyAsync(q => q.Id == questionId && q.ActivityId == activity.Id, ct);
-            if (!exists) throw new NotFoundException("Question");
+            // **What the caller may see, not merely what exists.** Testing the
+            // question's activity alone made this an id oracle: an enrolled
+            // participant could tell a real id from a made-up one, including for
+            // somebody else's unpublished question. The clause is the list's own.
+            var readsAll = await permissions.HasAsync(Permissions.QuestionReadAll, activity.Id, ct);
+            var visible = await context.Questions.AnyAsync(q =>
+                q.Id == questionId
+                && q.ActivityId == activity.Id
+                && (readsAll || q.IsPublished || q.AuthorUserId == user.Id), ct);
+            if (!visible) throw new NotFoundException("Question");
 
             var already = await context.QuestionReads
                 .AnyAsync(r => r.QuestionId == questionId && r.UserId == user.Id, ct);

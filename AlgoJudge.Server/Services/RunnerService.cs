@@ -1175,9 +1175,22 @@ namespace AlgoJudge.Server.Services
             var submissions = held.Select(j => j.SubmissionId).ToList();
             var jobs = held.Select(j => j.Id).ToList();
 
+            // **The version branch is scoped, and that is the whole of this
+            // check's teeth.** A problem version carries three audiences: the
+            // statement a participant reads, the package a Runner runs, and the
+            // model solution a manager keeps. Matching the version alone handed
+            // a Runner all three, so anything judging a problem could fetch its
+            // model solution by id — which `FileService.CanReadProblemVersionAsync`
+            // says in as many words it must never do. Closed 2026-09-09.
+            //
+            // The other two branches stay unscoped on purpose: a submission's
+            // source is stored at participant scope and is exactly what the job
+            // is about, and a job's own attachments are what this Runner put
+            // there.
             return await context.FileReferences.AsNoTracking().AnyAsync(r =>
                 r.FileId == fileId
-                && ((r.ProblemVersionId != null && versions.Contains(r.ProblemVersionId.Value))
+                && ((r.ProblemVersionId != null && versions.Contains(r.ProblemVersionId.Value)
+                        && r.Scope == FileScope.Runner)
                     || (r.SubmissionId != null && submissions.Contains(r.SubmissionId.Value))
                     || (r.EvaluationJobId != null && jobs.Contains(r.EvaluationJobId.Value))), ct);
         }

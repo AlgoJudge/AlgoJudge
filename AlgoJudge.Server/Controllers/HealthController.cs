@@ -25,8 +25,10 @@ namespace AlgoJudge.Server.Controllers
     /// </summary>
     [ApiController]
     [Route("health")]
-    // Said in prose above since this endpoint existed; said to the framework
-    // here, because the fallback policy closes everything that does not.
+    // Public by declaration rather than by omission, for the reason
+    // `InstanceController` gives — and said to the framework here, because the
+    // fallback policy closes everything that does not. A probe that needs a
+    // session is not a probe.
     [AllowAnonymous]
     public class HealthController(
         IMaintenanceService maintenance,

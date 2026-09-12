@@ -114,7 +114,7 @@ namespace AlgoJudge.Server.Services
         {
             var user = await currentUser.RequireAsync(ct);
             var seesEverything = await permissions.HasAsync(Permissions.ProblemReadAll, null, ct);
-            if (!seesEverything) await permissions.RequireAsync(Permissions.ProblemReadOwn, null, ct);
+            if (!seesEverything) await permissions.RequireAnywhereAsync(Permissions.ProblemReadOwn, ct);
 
             var query = context.Problems
                 .Include(p => p.SharedWith)
@@ -175,7 +175,7 @@ namespace AlgoJudge.Server.Services
 
         public async Task<ManagedProblemDto> CreateAsync(ProblemInputDto input, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.ProblemCreate, null, ct);
+            await permissions.RequireAnywhereAsync(Permissions.ProblemCreate, ct);
             var user = await currentUser.RequireAsync(ct);
 
             var slug = input.Slug?.Trim() ?? "";
@@ -218,7 +218,7 @@ namespace AlgoJudge.Server.Services
         public async Task<ManagedProblemVersionDto> PublishVersionAsync(
             Guid problemId, ProblemVersionInputDto input, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.ProblemUpdate, null, ct);
+            await permissions.RequireAnywhereAsync(Permissions.ProblemUpdate, ct);
             var user = await currentUser.RequireAsync(ct);
 
             var problem = await context.Problems.FirstOrDefaultAsync(p => p.Id == problemId, ct)
@@ -265,7 +265,19 @@ namespace AlgoJudge.Server.Services
                 {
                     throw new ConflictException($"This version already has a file called {name}", "version.file.duplicate");
                 }
-                if (!await context.Files.AnyAsync(f => f.Id == fileId, ct))
+                // **Readable by this caller, not merely present.** Existence was
+                // the whole test until 2026-09-09, and a reference is a read
+                // grant: attaching an arbitrary id at participant scope and then
+                // fetching it turned `problem:update` into a way to read another
+                // activity's submission source, an attempt's log or a Runner's.
+                // `RunnerService.IsOwnUploadAsync` closed exactly this on the
+                // Runner side; `TrialService` asks the same question before it
+                // queues a package.
+                //
+                // The ordinary flow is unaffected: whoever uploads a file may
+                // read it while it is unreferenced, which is what publishing a
+                // version does one call earlier.
+                if (!await files.CanReadAsync(fileId, ct))
                 {
                     throw new ValidationException($"No such file: {fileId}", "file.missing");
                 }
@@ -385,7 +397,7 @@ namespace AlgoJudge.Server.Services
 
         public async Task<ManagedProblemDto> UpdateAsync(Guid id, ProblemInputDto input, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.ProblemUpdate, null, ct);
+            await permissions.RequireAnywhereAsync(Permissions.ProblemUpdate, ct);
             var problem = await LoadAsync(id, ct);
             await RequireReadableAsync(problem, ct);
 
@@ -444,7 +456,7 @@ namespace AlgoJudge.Server.Services
         /// </summary>
         public async Task<ManagedProblemDto> SetArchivedAsync(Guid id, bool archived, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.ProblemArchive, null, ct);
+            await permissions.RequireAnywhereAsync(Permissions.ProblemArchive, ct);
             var problem = await LoadAsync(id, ct);
             await RequireReadableAsync(problem, ct);
 
@@ -465,7 +477,7 @@ namespace AlgoJudge.Server.Services
         /// </summary>
         public async Task<ManagedProblemDto> DuplicateAsync(Guid id, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.ProblemCreate, null, ct);
+            await permissions.RequireAnywhereAsync(Permissions.ProblemCreate, ct);
             var source = await LoadAsync(id, ct);
             await RequireReadableAsync(source, ct);
             var user = await currentUser.RequireAsync(ct);
@@ -541,7 +553,7 @@ namespace AlgoJudge.Server.Services
         public async Task<ManagedProblemDto> SetVisibilityAsync(
             Guid id, string visibility, IReadOnlyList<string>? sharedWith, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.ProblemShare, null, ct);
+            await permissions.RequireAnywhereAsync(Permissions.ProblemShare, ct);
             var problem = await LoadAsync(id, ct);
             await RequireReadableAsync(problem, ct);
 
@@ -617,7 +629,7 @@ namespace AlgoJudge.Server.Services
         public async Task<(Stream Bytes, string Name)?> PackageAsync(
             Guid problemId, Guid versionId, CancellationToken ct)
         {
-            await permissions.RequireAsync(Permissions.ProblemUpdate, null, ct);
+            await permissions.RequireAnywhereAsync(Permissions.ProblemUpdate, ct);
             var problem = await LoadAsync(problemId, ct);
             await RequireReadableAsync(problem, ct);
 
@@ -653,9 +665,14 @@ namespace AlgoJudge.Server.Services
             string activityIdOrSlug, string problemSlug, CancellationToken ct)
         {
             var activity = await activities.ResolveAsync(activityIdOrSlug, ct);
+            await activities.RequireVisibleAsync(activity, ct);
             await permissions.RequireAsync(Permissions.ActivityRead, activity.Id, ct);
             await lockdown.RequireReachableAsync(activity.Id, ct);
             var user = await currentUser.RequireAsync(ct);
+            // Membership, which a permission does not answer: a participant's
+            // keys held at system scope reach every activity, and being in one
+            // is a different question. See `Membership`.
+            await Membership.RequireAsync(context, permissions, activity.Id, user.Id, ct);
 
             var assignment = await context.SeriesProblems
                 .Include(sp => sp.Series)

@@ -697,9 +697,10 @@ namespace AlgoJudge.Server
                 // Not merely untidy: this value is in a compose file in a public
                 // repository, so an installation running it has an admin surface
                 // whose token anybody can read.
-                startup.LogWarning(
-                    "AJ_Admin__Token is the well-known development token outside Development. "
-                    + "Anybody who can read this product's repository can throw the switch.");
+                startup.LogError(
+                    "AJ_Admin__Token is the well-known development token, so /admin is closed. "
+                    + "Set a secret of your own: the published value would let anybody who can "
+                    + "reach the surface throw the switch.");
             }
 
             app.Run();
