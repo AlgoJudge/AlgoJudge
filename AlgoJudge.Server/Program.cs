@@ -4,6 +4,7 @@ using AlgoJudge.Server.Database.Models;
 using AlgoJudge.Server.Services;
 using AlgoJudge.Server.Realtime;
 using AlgoJudge.Server.Utils;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -95,7 +96,22 @@ namespace AlgoJudge.Server
             // because it is the same subject.
             builder.Services.AddSingleton<IKeyRingOperations, KeyRingOperations>();
 
-            builder.Services.AddAuthorization();
+            // **Closed unless somebody opened it.** Without a fallback policy an
+            // endpoint carrying neither attribute is anonymous, so security is
+            // opt-in and a controller added without `[Authorize]` is a hole
+            // nothing reports. Fifteen endpoints were relying on that default —
+            // every one of them deliberately, and every one of them now saying
+            // so out loud. `EndpointCensusTests` holds the list.
+            //
+            // This is a floor, not the rule: what a caller may *do* is decided
+            // by the permission model, and several open endpoints authorise
+            // themselves in the handler because a policy cannot express what
+            // they check — a file readable through any reference, a socket
+            // handshake, a platform's signed launch.
+            builder.Services.AddAuthorization(options =>
+                options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .Build());
             builder.Services.AddIdentityApiEndpoints<User>(options =>
             {
                 // Twelve characters of anything, rather than a character-class
@@ -167,6 +183,38 @@ namespace AlgoJudge.Server
                         Authorization.EmbeddedSessions.Widen(context.CookieOptions);
                         // So anything else set in this same response knows too.
                         Authorization.EmbeddedSessions.Mark(context.HttpContext);
+                    }
+                };
+
+                // **The other half, and without it there was no way out of an
+                // embedded session at all.**
+                //
+                // A cookie is deleted by writing it again, empty and expired,
+                // and a browser only matches that against a cookie with the
+                // same attributes. `Partitioned` is the one that decides here:
+                // a partitioned cookie lives in a jar of its own, keyed to the
+                // site that did the embedding, so a deletion written without
+                // the attribute reaches a different jar and removes nothing.
+                //
+                // The sign-out then answered 204 with the session still valid,
+                // which is the worst shape this can take: the interface says it
+                // worked, and the next person at the keyboard is signed in as
+                // the previous one. Reported from production on 2026-09-09,
+                // after a launch from Moodle, and it does not reproduce in a
+                // private window — there is no partitioned cookie there to miss.
+                //
+                // Asked of the ticket being signed out rather than of the
+                // request, for the same reason the sign-in half exists: only
+                // the sessions that asked to be widened are widened.
+                var signingOut = options.Events.OnSigningOut;
+                options.Events.OnSigningOut = async context =>
+                {
+                    if (signingOut is not null) await signingOut(context);
+                    if (await Authorization.EmbeddedSessions.IsEmbeddedAsync(
+                            context.HttpContext,
+                            Microsoft.AspNetCore.Identity.IdentityConstants.ApplicationScheme))
+                    {
+                        Authorization.EmbeddedSessions.Widen(context.CookieOptions);
                     }
                 };
             });
@@ -382,6 +430,73 @@ namespace AlgoJudge.Server
             // prefix exists to prevent — a Client asking a correct host for the
             // wrong path would be answered instead of corrected. So the guard is
             // explicit, and it runs before the base is stripped.
+            // **`noindex` on everything this Server answers.**
+            //
+            // A `Disallow` keeps a crawler from *fetching* a URL; it is this
+            // header that keeps one out of an index, and only this header
+            // survives the case the robots file cannot reach — an installation
+            // that serves the API from a host of its own, where the Client's
+            // file governs nothing.
+            //
+            // **Public files carry it too**, deliberately. A crawler still
+            // fetches them, which is what a rendered page needs, and a `noindex`
+            // on a resource does not stop the page that draws it being indexed.
+            // What it does stop is the terms of service being indexed twice —
+            // once as the Client's own page and once as the raw document behind
+            // it, competing with each other.
+            //
+            // `OnStarting` rather than a plain assignment: `UseExceptionHandler`
+            // clears the response before it writes a failure, and a header set
+            // on the way in would go with it.
+            app.Use((context, next) =>
+            {
+                context.Response.OnStarting(() =>
+                {
+                    context.Response.Headers["X-Robots-Tag"] = "noindex";
+                    return Task.CompletedTask;
+                });
+
+                return next();
+            });
+
+            // **At the host root, which is why it is in front of the guard
+            // below.** A robots file is only ever read at `/robots.txt`, and
+            // everything this Server answers otherwise lives under `/api/v1` —
+            // so the guard would 404 it, and mapping it as an endpoint would
+            // publish it one directory down where nothing looks.
+            //
+            // It matters in one deployment: an API on a host of its own. Where
+            // one origin serves both halves, the Client's file is what answers
+            // and this is never reached. The two say the same thing, and for the
+            // same reason — a page a crawler renders draws the operator's logo
+            // and documents from `/api/v1/files/`, so that prefix has to stay
+            // fetchable while the rest of the API does not.
+            app.Use(async (context, next) =>
+            {
+                if (!context.Request.Path.Equals("/robots.txt", StringComparison.OrdinalIgnoreCase))
+                {
+                    await next();
+                    return;
+                }
+
+                context.Response.ContentType = "text/plain; charset=utf-8";
+                await context.Response.WriteAsync("""
+                    # This host serves an API. Nothing here is a page.
+                    #
+                    # The one exception is a stored file: an installation's logo and
+                    # its published documents are drawn by pages on the application's
+                    # own host, and a crawler that may not fetch them renders those
+                    # pages without them. Every id is authorised and answers 404 to a
+                    # caller who may not read it, so this opens nothing.
+                    #
+                    # Everything reachable here also carries `X-Robots-Tag: noindex`.
+
+                    User-agent: *
+                    Allow: /api/v1/files/
+                    Disallow: /
+                    """);
+            });
+
             app.Use(async (context, next) =>
             {
                 if (!context.Request.Path.StartsWithSegments(ApiPathBase, StringComparison.OrdinalIgnoreCase))
@@ -458,6 +573,27 @@ namespace AlgoJudge.Server
             // meant the identity cookie was never turned into a ClaimsPrincipal
             // and every [Authorize] endpoint answered 401 to a signed-in caller.
             app.UseAuthentication();
+
+            // **An address that matches nothing is a 404, not a 401.** The
+            // fallback policy set above is applied to a request with no endpoint
+            // as well — that is what it is documented to do — so with it in place
+            // every mistyped path started answering `Unauthorized`. Two things
+            // that costs: this Server's error contract says `not_found`, and the
+            // Client reads a 401 as *your session ended* and sends the reader to
+            // the sign-in screen, so a typo in an address would look like being
+            // signed out. Answered in front of authorization because there is
+            // nothing there to authorise; `UseStatusCodePages` above shapes it.
+            app.Use(async (context, next) =>
+            {
+                if (context.GetEndpoint() is null)
+                {
+                    context.Response.StatusCode = StatusCodes.Status404NotFound;
+                    return;
+                }
+
+                await next();
+            });
+
             app.UseAuthorization();
 
             // In front of the endpoints rather than around them: MapIdentityApi
@@ -489,7 +625,26 @@ namespace AlgoJudge.Server
 
             app.UseWebSockets();
 
-            app.MapGroup("/identity").MapIdentityApi<User>();
+            // **Opened one endpoint at a time, not as a group.** `MapIdentityApi`
+            // maps `manage/*` with its own authorization and the rest without
+            // any, and a group-level `AllowAnonymous()` is applied *after* an
+            // endpoint's own metadata — so it would win, and `manage/2fa` would
+            // be reachable by anybody. This adds the attribute only where the
+            // framework left none, which is exactly the set that was already
+            // anonymous. What may be reached at all is `UseIdentitySurfaceRules`
+            // above; this decides only who has to be signed in first.
+            // **`Finally`, not `Add`.** `MapIdentityApi` puts `manage/*` in a
+            // nested group and authorises that group, and a convention on the
+            // outer group runs *before* the inner one — so `Add` saw no
+            // `IAuthorizeData` on `manage/2fa` and `manage/info`, opened all
+            // three, and `EndpointCensusTests` is where that was caught rather
+            // than in production. `Finally` runs after every convention, which is
+            // the only point at which this question has an answer.
+            app.MapGroup("/identity").MapIdentityApi<User>().Finally(endpoint =>
+            {
+                if (endpoint.Metadata.OfType<IAuthorizeData>().Any()) return;
+                endpoint.Metadata.Add(new AllowAnonymousAttribute());
+            });
             app.MapControllers();
 
             AlgoJudge.Server.Lti.LtiModule.MapLti(app);

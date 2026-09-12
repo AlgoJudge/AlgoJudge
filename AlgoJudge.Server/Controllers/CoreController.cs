@@ -1,7 +1,10 @@
+using System.Security.Claims;
 using AlgoJudge.Server.Api;
 using AlgoJudge.Server.Api.Contracts;
 using AlgoJudge.Server.Authorization;
+using AlgoJudge.Server.Realtime;
 using AlgoJudge.Server.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,11 +18,10 @@ namespace AlgoJudge.Server.Controllers
     [ApiController]
     [Route("instance")]
     // **Public by declaration, not by omission.** Nothing here carried an
-    // attribute, and it was reachable only because no fallback policy is
-    // registered — so a fallback added later would close it silently, and a
-    // controller written without `[Authorize]` is public today by accident
-    // rather than by decision. What it serves is meant to be public: the
-    // sign-in screen has to draw itself before anybody is signed in.
+    // attribute, and it was reachable only because authorization was opt-in —
+    // which it no longer is. The fallback policy registered in `Program` would
+    // have closed this controller silently. What it serves is meant to be
+    // public: the sign-in screen has to draw itself before anybody is signed in.
     [AllowAnonymous]
     public class InstanceController(IInstanceService instances) : ControllerBase
     {
@@ -120,14 +122,69 @@ namespace AlgoJudge.Server.Controllers
     [Route("identity")]
     [Authorize]
     public class SignOutController(
-        Microsoft.AspNetCore.Identity.SignInManager<Database.Models.User> signIn
+        Microsoft.AspNetCore.Identity.SignInManager<Database.Models.User> signIn,
+        Database.ApplicationDbContext context,
+        IRequestOrigin origin,
+        TimeProvider clock
     ) : ControllerBase
     {
+        /// <summary>
+        /// Ends the session in all three places it exists: the authentication
+        /// cookie, the row the sessions screen reads, and the cookie that names
+        /// that row.
+        ///
+        /// <para>
+        /// <b>It used to end only the first.</b> The row stayed open and the
+        /// `aj_session` cookie stayed in the browser, so the next account signed
+        /// in there was recorded against the previous account's session — see
+        /// the predicate in <see cref="SessionTrackingMiddleware"/>, which is the
+        /// other half of the same fix.
+        /// </para>
+        /// </summary>
         [HttpPost("logout")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         public async Task<IActionResult> Logout()
         {
+            // Asked first, while the ticket is still there to be read.
+            var embedded = await EmbeddedSessions.IsEmbeddedAsync(
+                HttpContext, Microsoft.AspNetCore.Identity.IdentityConstants.ApplicationScheme);
+
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (origin.SessionId is { } id && userId is not null)
+            {
+                var session = await context.UserSessions.FirstOrDefaultAsync(
+                    s => s.Id == id && s.UserId == userId && s.EndedAt == null);
+                if (session is not null)
+                {
+                    session.EndedAt = clock.GetUtcNow().UtcDateTime;
+                    await context.SaveChangesAsync();
+                }
+            }
+
             await signIn.SignOutAsync();
+
+            // **Appended empty and expired rather than `Delete`d.** Deleting a
+            // cookie *is* writing it again, and this one has to carry the same
+            // attributes it was written with or the browser keeps it — the
+            // `Partitioned` of an embedded session most of all, which lives in a
+            // jar of its own. `ResponseCookies.Delete` builds its own options and
+            // does not carry an extension across; appending says exactly what is
+            // sent.
+            var cookie = new CookieOptions
+            {
+                HttpOnly = true,
+                SameSite = SameSiteMode.Lax,
+                Secure = Request.IsHttps,
+                IsEssential = true,
+                Expires = DateTimeOffset.UnixEpoch,
+            };
+            if (embedded) EmbeddedSessions.Widen(cookie);
+            Response.Cookies.Append(SessionTrackingMiddleware.SessionCookie, string.Empty, cookie);
+
+            // Or the tracking middleware, which runs after this, opens a fresh
+            // row and hands back a fresh cookie on the way out.
+            SessionTrackingMiddleware.Ended(HttpContext);
+
             return NoContent();
         }
     }
