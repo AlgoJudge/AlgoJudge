@@ -852,6 +852,13 @@ namespace AlgoJudge.Server.Api.Contracts
         public required string Id { get; init; }
         public required string ActivityId { get; init; }
         public required string ActivityName { get; init; }
+        /// <summary>
+        /// Beside the name, as <c>ManagedSubmissionDto</c> and
+        /// <c>ManagedQuestionDto</c> both carry it. This queue mixes activities
+        /// more than either of them does — one person works several rooms — and a
+        /// slug is what those rooms are called out loud.
+        /// </summary>
+        public required string ActivitySlug { get; init; }
         public required string RequestedByName { get; init; }
         /// <summary>The group as it was when the request was made, if any.</summary>
         public string? GroupName { get; init; }
