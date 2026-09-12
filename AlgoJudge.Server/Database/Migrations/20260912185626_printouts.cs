@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace AlgoJudge.Server.Database.Migrations
 {
     /// <inheritdoc />
-    public partial class printouts : Migration
+    public partial class Printouts : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

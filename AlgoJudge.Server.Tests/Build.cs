@@ -326,6 +326,8 @@ public static class Build
         activity.RankingType = "points";
         activity.TimeZone = "Europe/Lisbon";
         activity.HasQuestions = false;
+        // The default is off, so on is what tells carried from dropped.
+        activity.HasPrintouts = true;
         activity.ScoreVisibility = ScoreVisibility.ManagersOnly;
         activity.ShowGroupMembers = true;
         activity.JoinPolicy = JoinPolicy.Open;

@@ -69,6 +69,12 @@ namespace AlgoJudge.Server.Api.Contracts
         public const string ManagerSeriesChanged = "managerSeriesChanged";
         public const string SubmissionChanged = "submissionChanged";
         public const string QuestionChanged = "questionChanged";
+        /// <summary>
+        /// A print request appeared or was resolved. **Manager only**: two people
+        /// at one printer, each looking at a list that has not moved, is how the
+        /// same page gets printed twice.
+        /// </summary>
+        public const string PrintoutChanged = "printoutChanged";
         public const string UserChanged = "userChanged";
         public const string RunnerChanged = "runnerChanged";
         public const string InstanceChanged = "instanceChanged";

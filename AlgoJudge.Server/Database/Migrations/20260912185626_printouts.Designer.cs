@@ -15,7 +15,7 @@ namespace AlgoJudge.Server.Database.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
     [Migration("20260912185626_printouts")]
-    partial class printouts
+    partial class Printouts
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
